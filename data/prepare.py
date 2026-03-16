@@ -25,7 +25,7 @@ def configurar_logger():
     logger.setLevel(logging.DEBUG)
     fmt_console = logging.Formatter('[%(asctime)s] %(levelname)-8s | %(message)s', datefmt='%H:%M:%S')
     fmt_file    = logging.Formatter('[%(asctime)s] %(levelname)-8s | %(name)s | %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    ch = logging.StreamHandler(sys.stdout)
+    ch = logging.StreamHandler(open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1))
     ch.setLevel(logging.INFO)
     ch.setFormatter(fmt_console)
     logger.addHandler(ch)
@@ -70,6 +70,11 @@ RUTAS_REPOSITORIOS = [
     r"C:\Users\julio\Documents\Dev\monorepo\search-engine",
     r"C:\Users\julio\Documents\Dev\Python\MusicPlayer",
     r"C:\Users\julio\Documents\Dev\rust\rust-raytracer",
+    r"C:\Users\julio\Documents\Dev\typescript\sqlmodel",
+    r"C:\Users\julio\Documents\Dev\typescript\pydantic",
+    r"C:\Users\julio\Documents\Dev\typescript\prisma",
+    r"C:\Users\julio\Documents\Dev\typescript\book",
+    r"C:\Users\julio\Documents\Dev\typescript\vite"
 ]
 
 MAX_CODIGO_FRAGMENTS = 250000
@@ -212,7 +217,8 @@ def consolidar_cache_en_output():
 # ----------------------------------------------------------------------
 
 def fetch_wikipedia_article(title: str) -> list[str] | None:
-    url_title = urllib.parse.quote(title)
+    titulo_decodificado = urllib.parse.unquote(title)
+    url_title = urllib.parse.quote(titulo_decodificado)
     url = (
         f"https://es.wikipedia.org/w/api.php"
         f"?action=query&prop=extracts&explaintext=1&format=json&titles={url_title}"
