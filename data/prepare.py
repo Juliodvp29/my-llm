@@ -215,13 +215,12 @@ def consolidar_cache_en_output():
 # ----------------------------------------------------------------------
 # 1. Wikipedia con threads — con rate limiting real en los workers
 # ----------------------------------------------------------------------
-
 def fetch_wikipedia_article(title: str) -> list[str] | None:
     titulo_decodificado = urllib.parse.unquote(title)
     url_title = urllib.parse.quote(titulo_decodificado)
     url = (
         f"https://es.wikipedia.org/w/api.php"
-        f"?action=query&prop=extracts&explaintext=1&format=json&titles={url_title}"
+        f"?action=query&prop=extracts&explaintext=1&titles={url_title}&format=json"
     )
     headers = {'User-Agent': 'MiLLMDataBuilder/2.0 (aprendizaje, sin fines comerciales)'}
     req = urllib.request.Request(url, headers=headers)
@@ -237,7 +236,6 @@ def fetch_wikipedia_article(title: str) -> list[str] | None:
     except Exception as e:
         logger.debug(f"Error Wiki ({title}): {e}")
         return None
-
 
 def procesar_wikipedia_con_hilos():
     NOMBRE_CACHE = "wikipedia"
@@ -433,9 +431,17 @@ def procesar_gutenberg():
 
     # Caché granular por libro — permite reanudar si se interrumpe
     cache_libros_path = os.path.join(CACHE_DIR, "gutenberg_descargados.json")
+    libros_descargados = set()
+
     if os.path.exists(cache_libros_path):
-        with open(cache_libros_path, 'r') as f:
-            libros_descargados: set = set(json.load(f))
+        try:
+            with open(cache_libros_path, 'r') as f:
+                contenido = f.read().strip()
+                if contenido:  # solo parsear si no está vacío
+                    libros_descargados = set(json.loads(contenido))
+        except (json.JSONDecodeError, ValueError):
+            logger.warning("gutenberg_descargados.json corrupto, empezando desde cero.")
+            libros_descargados = set()
     else:
         libros_descargados: set = set()
 
