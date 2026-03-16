@@ -2,13 +2,15 @@ import os
 import json
 import re
 import urllib.request
-from pathlib import Path
+import urllib.error
 import urllib.parse
 import unicodedata
 import time
 import logging
 import sys
+import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 if os.name == 'nt':
     import subprocess
@@ -29,7 +31,7 @@ def configurar_logger():
     ch.setLevel(logging.INFO)
     ch.setFormatter(fmt_console)
     logger.addHandler(ch)
-    fh = logging.FileHandler('data/dataset-builder.log')
+    fh = logging.FileHandler('data/dataset-builder.log', encoding='utf-8')
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(fmt_file)
     logger.addHandler(fh)
@@ -41,7 +43,7 @@ logger = configurar_logger()
 # Configuración
 # ----------------------------------------------------------------------
 OUTPUT_FILE   = "data/dataset.jsonl"
-CACHE_DIR     = "data/raw"               # caché por fuente — sobrevive interrupciones
+CACHE_DIR     = "data/raw"
 os.makedirs("data", exist_ok=True)
 os.makedirs(CACHE_DIR, exist_ok=True)
 
@@ -77,44 +79,35 @@ RUTAS_REPOSITORIOS = [
     r"C:\Users\julio\Documents\Dev\typescript\vite"
 ]
 
-MAX_CODIGO_FRAGMENTS = 250000
-# Tamaño máximo de fragmento en caracteres — alineado con max_len=512 tokens
-# ~4 chars/token en español → 512 * 4 = ~2048 chars de techo seguro
-MAX_FRAGMENT_CHARS = 1800
+MAX_CODIGO_FRAGMENTS = 250_000
+MAX_FRAGMENT_CHARS   = 1800
 
 
 # ----------------------------------------------------------------------
-# Utilidades de limpieza — DOS versiones: texto natural vs código
+# Utilidades de limpieza
 # ----------------------------------------------------------------------
 
 def limpiar_texto_natural(text: str) -> str:
-    """Para Wikipedia y libros: normaliza espacios, elimina control chars."""
     text = unicodedata.normalize("NFC", text)
     text = ''.join(c for c in text if unicodedata.category(c)[0] != 'C' or c in '\n ')
-    text = re.sub(r'\n{3,}', '\n\n', text)      # máximo doble salto
-    text = re.sub(r'[ \t]+', ' ', text)          # colapsa espacios/tabs pero NO saltos
-    text = re.sub(r' *\n *', '\n', text)         # limpia espacios alrededor de saltos
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r' *\n *', '\n', text)
     return text.strip()
 
 def limpiar_codigo(text: str) -> str:
-    """Para código fuente: preserva indentación y saltos de línea reales."""
     text = unicodedata.normalize("NFC", text)
     text = ''.join(c for c in text if unicodedata.category(c)[0] != 'C' or c in '\n\t ')
-    text = re.sub(r'\n{5,}', '\n\n\n', text)    # máximo triple salto vacío
-    text = re.sub(r'[ \t]+$', '', text, flags=re.MULTILINE)  # trailing whitespace por línea
+    text = re.sub(r'\n{5,}', '\n\n\n', text)
+    text = re.sub(r'[ \t]+$', '', text, flags=re.MULTILINE)
     return text.strip()
 
 
 # ----------------------------------------------------------------------
-# Fragmentación inteligente por párrafos
+# Fragmentación
 # ----------------------------------------------------------------------
 
 def fragmentar_por_parrafos(texto: str, max_chars: int = MAX_FRAGMENT_CHARS, min_chars: int = 150) -> list[str]:
-    """
-    Divide texto respetando párrafos (doble salto de línea).
-    No corta oraciones a la mitad. Si un párrafo individual es más largo
-    que max_chars, lo subdivide por oraciones.
-    """
     parrafos = re.split(r'\n{2,}', texto)
     fragmentos = []
     buffer = ""
@@ -124,7 +117,6 @@ def fragmentar_por_parrafos(texto: str, max_chars: int = MAX_FRAGMENT_CHARS, min
         if not parrafo:
             continue
 
-        # Si el párrafo solo ya es demasiado largo, subdividir por oraciones
         if len(parrafo) > max_chars:
             oraciones = re.split(r'(?<=[.!?])\s+', parrafo)
             sub_buffer = ""
@@ -139,7 +131,6 @@ def fragmentar_por_parrafos(texto: str, max_chars: int = MAX_FRAGMENT_CHARS, min
                 fragmentos.append(sub_buffer.strip())
             continue
 
-        # Si agregar este párrafo supera el límite, vuelca el buffer
         if len(buffer) + len(parrafo) + 2 > max_chars:
             if len(buffer) >= min_chars:
                 fragmentos.append(buffer.strip())
@@ -155,20 +146,30 @@ def fragmentar_por_parrafos(texto: str, max_chars: int = MAX_FRAGMENT_CHARS, min
 
 def fragmentar_codigo(texto: str, max_chars: int = MAX_FRAGMENT_CHARS, min_chars: int = 100) -> list[str]:
     """
-    Divide código respetando bloques de funciones/clases (líneas en blanco).
-    Preserva saltos de línea reales.
+    Divide código respetando bloques lógicos (funciones/clases delimitadas
+    por líneas en blanco). Produce múltiples fragmentos pequeños en vez
+    de acumular hasta el tope y volcar todo de golpe.
     """
     lineas = texto.split('\n')
     fragmentos = []
-    buffer_lineas = []
+    buffer_lineas: list[str] = []
 
     for linea in lineas:
         buffer_lineas.append(linea)
-        contenido_buffer = '\n'.join(buffer_lineas)
+        contenido = '\n'.join(buffer_lineas)
 
-        if len(contenido_buffer) >= max_chars:
-            if len(contenido_buffer) >= min_chars:
-                fragmentos.append(contenido_buffer)
+        # Umbral de volcado: cuando el buffer supera max_chars
+        # Y estamos en una línea vacía (límite natural de bloque)
+        if len(contenido) >= max_chars and linea.strip() == '':
+            if len(contenido.strip()) >= min_chars:
+                fragmentos.append(contenido.strip())
+            buffer_lineas = []
+            continue
+
+        # Forzar corte si el buffer se desborda mucho (sin línea vacía cercana)
+        if len(contenido) >= max_chars * 1.5:
+            if len(contenido.strip()) >= min_chars:
+                fragmentos.append(contenido.strip())
             buffer_lineas = []
 
     resto = '\n'.join(buffer_lineas).strip()
@@ -179,11 +180,10 @@ def fragmentar_codigo(texto: str, max_chars: int = MAX_FRAGMENT_CHARS, min_chars
 
 
 # ----------------------------------------------------------------------
-# Escritura con caché — cada fuente tiene su propio archivo .jsonl en raw/
+# Caché
 # ----------------------------------------------------------------------
 
 def guardar_en_cache(fragmentos: list[str], nombre_cache: str):
-    """Guarda fragmentos en data/raw/<nombre>.jsonl (modo append)."""
     if not fragmentos:
         return
     ruta = os.path.join(CACHE_DIR, f"{nombre_cache}.jsonl")
@@ -199,8 +199,7 @@ def cache_existe(nombre_cache: str) -> bool:
 
 
 def consolidar_cache_en_output():
-    """Une todos los .jsonl de data/raw/ en data/dataset.jsonl final."""
-    logger.info("Consolidando caché en dataset final...")
+    logger.info("Consolidando cache en dataset final...")
     total = 0
     with open(OUTPUT_FILE, 'w', encoding='utf-8') as out:
         for archivo in sorted(Path(CACHE_DIR).glob("*.jsonl")):
@@ -208,80 +207,154 @@ def consolidar_cache_en_output():
                 for linea in f:
                     out.write(linea)
                     total += 1
-    logger.info(f"Dataset consolidado: {total:,} fragmentos → {OUTPUT_FILE}")
+    logger.info(f"Dataset consolidado: {total:,} fragmentos -> {OUTPUT_FILE}")
     return total
 
 
 # ----------------------------------------------------------------------
-# 1. Wikipedia con threads — con rate limiting real en los workers
+# Wikipedia — reintentos con backoff exponencial + URL encoding correcto
 # ----------------------------------------------------------------------
-def fetch_wikipedia_article(title: str) -> list[str] | None:
-    titulo_decodificado = urllib.parse.unquote(title)
-    url_title = urllib.parse.quote(titulo_decodificado)
+
+def _encode_wiki_title(title: str) -> str:
+    """
+    Codifica correctamente el título para la API de Wikipedia.
+    Preserva guiones bajos (espacios en wiki) pero encodea el resto.
+    """
+    # Primero decodificamos por si ya viene parcialmente encoded
+    decoded = urllib.parse.unquote(title)
+    # Re-encodeamos correctamente: espacios→%20, preservamos _
+    # Wikipedia acepta _ como espacio, así que los preservamos
+    encoded = urllib.parse.quote(decoded, safe='_:()/')
+    return encoded
+
+
+def fetch_wikipedia_article(title: str, max_retries: int = 3) -> list[str] | None:
+    encoded_title = _encode_wiki_title(title)
     url = (
         f"https://es.wikipedia.org/w/api.php"
-        f"?action=query&prop=extracts&explaintext=1&titles={url_title}&format=json"
+        f"?action=query&prop=extracts&explaintext=1"
+        f"&titles={encoded_title}&format=json&redirects=1"
     )
     headers = {'User-Agent': 'MiLLMDataBuilder/2.0 (aprendizaje, sin fines comerciales)'}
-    req = urllib.request.Request(url, headers=headers)
-    try:
-        with urllib.request.urlopen(req, timeout=10) as response:
-            data = json.loads(response.read().decode())
-            pages = data['query']['pages']
-            for page_id, info in pages.items():
-                if page_id == '-1' or 'extract' not in info:
-                    return None
-                texto = limpiar_texto_natural(info['extract'])
-                return fragmentar_por_parrafos(texto)
-    except Exception as e:
-        logger.debug(f"Error Wiki ({title}): {e}")
-        return None
+
+    for intento in range(max_retries):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=15) as response:
+                # Respetar Retry-After si lo devuelve el servidor
+                data = json.loads(response.read().decode())
+                pages = data['query']['pages']
+                for page_id, info in pages.items():
+                    if page_id == '-1' or 'extract' not in info:
+                        return None
+                    if not info['extract'].strip():
+                        return None
+                    texto = limpiar_texto_natural(info['extract'])
+                    return fragmentar_por_parrafos(texto)
+
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                # Rate limit explícito — esperar más
+                wait = (2 ** intento) * 5 + random.uniform(0, 2)
+                logger.debug(f"  Rate limit 429 en '{title}'. Esperando {wait:.1f}s...")
+                time.sleep(wait)
+            elif e.code in (500, 502, 503):
+                wait = (2 ** intento) * 2
+                logger.debug(f"  Error {e.code} en '{title}'. Reintento {intento+1}/{max_retries}...")
+                time.sleep(wait)
+            else:
+                logger.debug(f"  HTTP {e.code} en '{title}': {e}")
+                return None
+
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            wait = (2 ** intento) * 1.5 + random.uniform(0, 1)
+            logger.debug(f"  Error de red en '{title}' (intento {intento+1}): {e}. Reintento en {wait:.1f}s...")
+            time.sleep(wait)
+
+        except Exception as e:
+            logger.debug(f"  Error inesperado en '{title}': {e}")
+            return None
+
+    logger.debug(f"  Agotados {max_retries} intentos para '{title}'")
+    return None
+
 
 def procesar_wikipedia_con_hilos():
     NOMBRE_CACHE = "wikipedia"
 
-    if cache_existe(NOMBRE_CACHE):
-        # Contar cuántos ya hay para no rehacer el trabajo
+    # --- Caché granular por artículo para poder reanudar ---
+    cache_articulos_path = os.path.join(CACHE_DIR, "wikipedia_descargados.json")
+    articulos_descargados: set = set()
+
+    if os.path.exists(cache_articulos_path):
+        try:
+            with open(cache_articulos_path, 'r', encoding='utf-8') as f:
+                contenido = f.read().strip()
+                if contenido:
+                    articulos_descargados = set(json.loads(contenido))
+        except (json.JSONDecodeError, ValueError):
+            logger.warning("wikipedia_descargados.json corrupto, empezando desde cero.")
+
+    pendientes = [t for t in ARTICULOS_WIKIPEDIA if t not in articulos_descargados]
+
+    if not pendientes:
         ruta = os.path.join(CACHE_DIR, f"{NOMBRE_CACHE}.jsonl")
-        n = sum(1 for _ in open(ruta, encoding='utf-8'))
-        logger.info(f"Wikipedia: caché encontrada ({n:,} fragmentos). Saltando descarga.")
+        n = sum(1 for _ in open(ruta, encoding='utf-8')) if os.path.exists(ruta) else 0
+        logger.info(f"Wikipedia: todos los articulos en cache ({n:,} fragmentos). Saltando.")
         return n
 
-    logger.info("Iniciando extracción de Wikipedia (multihilo)...")
+    logger.info(f"Iniciando extraccion de Wikipedia ({len(pendientes)} pendientes de {len(ARTICULOS_WIKIPEDIA)})...")
+
     total_frag = 0
-    buffer = []
+    buffer: list[str] = []
     exitos = 0
+    fallos = 0
 
-    # Delay entre requests dentro del worker — respeta la API de Wikipedia
-    def fetch_con_delay(title):
-        time.sleep(0.2)   # 200ms entre requests por hilo → ~5 req/s con 5 hilos
-        return fetch_wikipedia_article(title)
+    # Configuración conservadora: 3 hilos con delay mayor evita rate limiting
+    # ~3 req/s total es seguro para la API pública de Wikipedia
+    def fetch_con_delay(title: str):
+        time.sleep(random.uniform(0.3, 0.7))  # jitter para evitar sincronización
+        return title, fetch_wikipedia_article(title)
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(fetch_con_delay, t): t for t in ARTICULOS_WIKIPEDIA}
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = {executor.submit(fetch_con_delay, t): t for t in pendientes}
+
         for idx, future in enumerate(as_completed(futures), 1):
             try:
-                frags = future.result()
+                titulo, frags = future.result()
                 if frags:
                     buffer.extend(frags)
                     total_frag += len(frags)
                     exitos += 1
-            except Exception:
-                pass
+                    articulos_descargados.add(titulo)
+                else:
+                    fallos += 1
+                    logger.debug(f"  Sin contenido: '{titulo}'")
 
-            if len(buffer) >= 100 or idx == len(ARTICULOS_WIKIPEDIA):
+            except Exception as e:
+                fallos += 1
+                logger.debug(f"  Excepcion en future: {e}")
+
+            # Guardar progreso cada 50 artículos completados
+            if idx % 50 == 0 or idx == len(pendientes):
                 guardar_en_cache(buffer, NOMBRE_CACHE)
                 buffer = []
+                # Persistir qué artículos ya están descargados
+                with open(cache_articulos_path, 'w', encoding='utf-8') as f:
+                    json.dump(list(articulos_descargados), f, ensure_ascii=False)
 
             if idx % 25 == 0:
-                logger.info(f"  [Wiki] {idx}/{len(ARTICULOS_WIKIPEDIA)} artículos. Fragmentos: {total_frag:,}")
+                logger.info(
+                    f"  [Wiki] {idx}/{len(pendientes)} procesados | "
+                    f"Exitos: {exitos} | Fallos: {fallos} | Fragmentos: {total_frag:,}"
+                )
 
-    logger.info(f"Wikipedia: {exitos} artículos exitosos, {total_frag:,} fragmentos.")
+    logger.info(f"Wikipedia: {exitos} articulos exitosos, {fallos} fallidos, {total_frag:,} fragmentos.")
     return total_frag
 
 
 # ----------------------------------------------------------------------
-# 2. Repositorios locales — fragmentos alineados con max_len del modelo
+# Repositorios locales — extensiones corregidas + fragmentación mejorada
 # ----------------------------------------------------------------------
 
 def directorio_valido(filepath: str) -> bool:
@@ -295,20 +368,34 @@ def directorio_valido(filepath: str) -> bool:
     return not any(exc in ruta for exc in excluir)
 
 
+# FIX: todas las extensiones con punto, sin duplicados
+EXTENSIONES_VALIDAS = {
+    '.py', '.js', '.ts', '.tsx', '.jsx',
+    '.html', '.css', '.scss', '.sass', '.less',
+    '.java', '.cpp', '.c', '.h', '.hpp',
+    '.go', '.rs', '.rb', '.php', '.swift', '.kt',
+    '.md', '.mdx', '.json', '.yaml', '.yml', '.toml',
+    '.sql', '.graphql', '.gql',
+    '.sh', '.bash', '.zsh',
+    '.r', '.m', '.cs', '.fs', '.ex', '.exs',
+    '.vue', '.svelte',
+}
+
+
 def procesar_repositorios_locales():
     NOMBRE_CACHE = "codigo_local"
 
     if cache_existe(NOMBRE_CACHE):
         ruta = os.path.join(CACHE_DIR, f"{NOMBRE_CACHE}.jsonl")
         n = sum(1 for _ in open(ruta, encoding='utf-8'))
-        logger.info(f"Código local: caché encontrada ({n:,} fragmentos). Saltando escaneo.")
+        logger.info(f"Codigo local: cache encontrada ({n:,} fragmentos). Saltando escaneo.")
         return n
 
-    logger.info(f"Escaneando repositorios locales (límite: {MAX_CODIGO_FRAGMENTS:,} fragmentos)...")
-    extensiones_validas = {'.py', '.js', '.ts', '.html', '.css', '.java', '.cpp', '.c', '.go', '.rs', '.md', '.json', '.rs', '.r', 'tsx', 'jsx', '.kt'}
+    logger.info(f"Escaneando repositorios locales (limite: {MAX_CODIGO_FRAGMENTS:,} fragmentos)...")
     total_frag = 0
-    buffer = []
+    buffer: list[str] = []
     archivos_procesados = 0
+    archivos_saltados = 0
 
     for ruta_base in RUTAS_REPOSITORIOS:
         if not os.path.exists(ruta_base):
@@ -318,7 +405,6 @@ def procesar_repositorios_locales():
         logger.info(f"  Escaneando: {ruta_base}")
 
         for root, dirs, files in os.walk(ruta_base):
-            # Modificar dirs in-place para que os.walk no descienda en carpetas excluidas
             dirs[:] = [d for d in dirs if directorio_valido(os.path.join(root, d))]
 
             if total_frag >= MAX_CODIGO_FRAGMENTS:
@@ -329,9 +415,10 @@ def procesar_repositorios_locales():
                     break
 
                 ext = os.path.splitext(file)[1].lower()
-                if ext not in extensiones_validas:
+                if ext not in EXTENSIONES_VALIDAS:
                     continue
-                if '.min.' in file or 'bundle' in file or 'lock' in file:
+                # Excluir archivos minificados, bundles y lockfiles
+                if any(x in file for x in ('.min.', 'bundle', '.lock', '-lock', 'package-lock', 'yarn.lock')):
                     continue
 
                 filepath = os.path.join(root, file)
@@ -339,45 +426,47 @@ def procesar_repositorios_locales():
                     with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
                         contenido = f.read()
 
-                    # Descartar archivos triviales o gigantes
-                    if not (50 < len(contenido) < 80_000):
+                    if not (50 < len(contenido) < 100_000):
+                        archivos_saltados += 1
                         continue
                     if contenido.count('\n') < 5:
+                        archivos_saltados += 1
                         continue
 
                     contenido_limpio = limpiar_codigo(contenido)
-
-                    # Prefijo descriptivo — le dice al modelo el contexto
-                    prefijo = f"# Archivo: {file} (extensión: {ext})\n\n"
+                    prefijo = f"# Archivo: {file} (extension: {ext})\n\n"
                     texto_con_prefijo = prefijo + contenido_limpio
 
                     frags = fragmentar_codigo(texto_con_prefijo)
-                    buffer.extend(frags)
-                    total_frag += len(frags)
-                    archivos_procesados += 1
+                    if frags:
+                        buffer.extend(frags)
+                        total_frag += len(frags)
+                        archivos_procesados += 1
 
                 except Exception:
-                    pass
+                    archivos_saltados += 1
 
-            if len(buffer) >= 200:
+            if len(buffer) >= 500:
                 guardar_en_cache(buffer, NOMBRE_CACHE)
                 buffer = []
 
         if total_frag >= MAX_CODIGO_FRAGMENTS:
-            logger.info(f"  ⚠️ Límite de {MAX_CODIGO_FRAGMENTS:,} fragmentos alcanzado.")
+            logger.info(f"  Limite de {MAX_CODIGO_FRAGMENTS:,} fragmentos alcanzado.")
             break
 
     guardar_en_cache(buffer, NOMBRE_CACHE)
-    logger.info(f"Código local: {archivos_procesados:,} archivos, {total_frag:,} fragmentos.")
+    logger.info(
+        f"Codigo local: {archivos_procesados:,} archivos procesados, "
+        f"{archivos_saltados:,} saltados, {total_frag:,} fragmentos."
+    )
     return total_frag
 
 
 # ----------------------------------------------------------------------
-# 3. Gutenberg — con caché por libro y marcadores correctos
+# Gutenberg
 # ----------------------------------------------------------------------
 
 def descargar_parsear_gutenberg(book_id: int) -> list[str] | None:
-    # Gutenberg tiene mirrors — intentamos el principal y uno de respaldo
     urls = [
         f"https://www.gutenberg.org/cache/epub/{book_id}/pg{book_id}.txt",
         f"https://gutenberg.org/files/{book_id}/{book_id}-0.txt",
@@ -388,15 +477,12 @@ def descargar_parsear_gutenberg(book_id: int) -> list[str] | None:
             with urllib.request.urlopen(req, timeout=15) as response:
                 texto = response.read().decode('utf-8', errors='ignore')
 
-            # Eliminar encabezado legal de Gutenberg
-            # El marcador real termina con *** seguido de doble salto de línea
             for patron_inicio in [
                 "*** START OF THE PROJECT GUTENBERG EBOOK",
                 "*** START OF THIS PROJECT GUTENBERG EBOOK",
             ]:
                 idx = texto.find(patron_inicio)
                 if idx != -1:
-                    # Buscar el fin de esa línea (el *** de cierre) y el primer párrafo
                     resto = texto[idx:]
                     fin_marcador = resto.find('\n\n')
                     if fin_marcador != -1:
@@ -413,8 +499,6 @@ def descargar_parsear_gutenberg(book_id: int) -> list[str] | None:
                     break
 
             texto_limpio = limpiar_texto_natural(texto)
-
-            # Fragmentar respetando párrafos
             fragmentos = fragmentar_por_parrafos(texto_limpio)
             if fragmentos:
                 return fragmentos
@@ -429,33 +513,29 @@ def descargar_parsear_gutenberg(book_id: int) -> list[str] | None:
 def procesar_gutenberg():
     NOMBRE_CACHE = "gutenberg"
 
-    # Caché granular por libro — permite reanudar si se interrumpe
     cache_libros_path = os.path.join(CACHE_DIR, "gutenberg_descargados.json")
-    libros_descargados = set()
+    libros_descargados: set = set()
 
     if os.path.exists(cache_libros_path):
         try:
             with open(cache_libros_path, 'r') as f:
                 contenido = f.read().strip()
-                if contenido:  # solo parsear si no está vacío
+                if contenido:
                     libros_descargados = set(json.loads(contenido))
         except (json.JSONDecodeError, ValueError):
             logger.warning("gutenberg_descargados.json corrupto, empezando desde cero.")
-            libros_descargados = set()
-    else:
-        libros_descargados: set = set()
 
     pendientes = [bid for bid in IDS_LIBROS_GUTENBERG if bid not in libros_descargados]
 
     if not pendientes:
         ruta = os.path.join(CACHE_DIR, f"{NOMBRE_CACHE}.jsonl")
         n = sum(1 for _ in open(ruta, encoding='utf-8')) if os.path.exists(ruta) else 0
-        logger.info(f"Gutenberg: todos los libros ya en caché ({n:,} fragmentos). Saltando descarga.")
+        logger.info(f"Gutenberg: todos los libros en cache ({n:,} fragmentos). Saltando.")
         return n
 
     logger.info(f"Descargando libros de Gutenberg ({len(pendientes)} pendientes de {len(IDS_LIBROS_GUTENBERG)})...")
     total_frag = 0
-    buffer = []
+    buffer: list[str] = []
 
     for i, book_id in enumerate(pendientes, 1):
         fragmentos = descargar_parsear_gutenberg(book_id)
@@ -464,7 +544,6 @@ def procesar_gutenberg():
             total_frag += len(fragmentos)
             libros_descargados.add(book_id)
 
-            # Guardamos el progreso de qué libros están listos
             with open(cache_libros_path, 'w') as f:
                 json.dump(list(libros_descargados), f)
 
@@ -473,7 +552,7 @@ def procesar_gutenberg():
             buffer = []
             logger.info(f"  [Libros] {i}/{len(pendientes)} procesados. Fragmentos: {total_frag:,}")
 
-        time.sleep(1.0)  # Rate limit con Gutenberg — no cambiar
+        time.sleep(1.0)
 
     logger.info(f"Gutenberg: {total_frag:,} fragmentos nuevos.")
     return total_frag
@@ -488,7 +567,7 @@ def generar_dataset_completo():
     logger.info("=" * 60)
     logger.info("INICIANDO GENERADOR DE DATASET LLM")
     logger.info("=" * 60)
-    logger.info(f"Caché en: {os.path.abspath(CACHE_DIR)}")
+    logger.info(f"Cache en: {os.path.abspath(CACHE_DIR)}")
     logger.info(f"Salida en: {os.path.abspath(OUTPUT_FILE)}")
     logger.info("Si interrumpes y reinicias, el progreso se conserva.")
     logger.info("=" * 60)
@@ -504,7 +583,7 @@ def generar_dataset_completo():
         logger.info("-" * 60)
 
     except KeyboardInterrupt:
-        logger.warning("Proceso interrumpido. El progreso hasta aquí está guardado en data/raw/")
+        logger.warning("Proceso interrumpido. El progreso esta guardado en data/raw/")
         logger.warning("Puedes reanudar ejecutando el script de nuevo.")
 
     finally:
@@ -513,7 +592,7 @@ def generar_dataset_completo():
         logger.info("=" * 60)
         logger.info("RESUMEN FINAL")
         logger.info(f"  Wikipedia:     {frag_wiki:,} fragmentos")
-        logger.info(f"  Código local:  {frag_codigo:,} fragmentos")
+        logger.info(f"  Codigo local:  {frag_codigo:,} fragmentos")
         logger.info(f"  Libros:        {frag_libros:,} fragmentos")
         logger.info(f"  TOTAL:         {total:,} fragmentos en dataset.jsonl")
         logger.info(f"  Tiempo total:  {tiempo:.1f}s ({tiempo/60:.1f} min)")
