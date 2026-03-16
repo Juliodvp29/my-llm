@@ -12,6 +12,15 @@ def cargar_modelo(checkpoint_path: str, tokenizer_path: str):
     checkpoint = torch.load(checkpoint_path, map_location="cpu")
     config = checkpoint["config"]
 
+    vocab_tokenizer = tokenizer.get_vocab_size()
+    vocab_modelo    = config["vocab_size"]
+    if vocab_tokenizer != vocab_modelo:
+        raise ValueError(
+            f"Incompatibilidad: tokenizer tiene {vocab_tokenizer} tokens "
+            f"pero el modelo fue entrenado con {vocab_modelo}. "
+            f"Usa el tokenizer y checkpoint del mismo entrenamiento."
+        )
+
     model = MiniGPT(
         vocab_size = config["vocab_size"],
         d_model    = config["d_model"],

@@ -26,3 +26,5 @@ build/
 #jsonl
 dataset.jsonl
 data/raw
+*.jsonl
+models/checkpoints/
