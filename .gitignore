@@ -18,3 +18,7 @@ build/
 
 # Variables de entorno (Seguridad)
 .env
+
+#txt
+*.log
+*.txt

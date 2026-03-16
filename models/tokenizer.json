@@ -1,0 +1,1231 @@
+{
+  "version": "1.0",
+  "truncation": null,
+  "padding": null,
+  "added_tokens": [
+    {
+      "id": 0,
+      "content": "<pad>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 1,
+      "content": "<unk>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 2,
+      "content": "<bos>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    {
+      "id": 3,
+      "content": "<eos>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    }
+  ],
+  "normalizer": null,
+  "pre_tokenizer": {
+    "type": "Whitespace"
+  },
+  "post_processor": null,
+  "decoder": null,
+  "model": {
+    "type": "BPE",
+    "dropout": null,
+    "unk_token": "<unk>",
+    "continuing_subword_prefix": null,
+    "end_of_word_suffix": null,
+    "fuse_unk": false,
+    "byte_fallback": false,
+    "ignore_merges": false,
+    "vocab": {
+      "<pad>": 0,
+      "<unk>": 1,
+      "<bos>": 2,
+      "<eos>": 3,
+      ".": 4,
+      "C": 5,
+      "E": 6,
+      "L": 7,
+      "P": 8,
+      "U": 9,
+      "a": 10,
+      "b": 11,
+      "c": 12,
+      "d": 13,
+      "e": 14,
+      "f": 15,
+      "g": 16,
+      "h": 17,
+      "i": 18,
+      "j": 19,
+      "l": 20,
+      "m": 21,
+      "n": 22,
+      "o": 23,
+      "p": 24,
+      "q": 25,
+      "r": 26,
+      "s": 27,
+      "t": 28,
+      "u": 29,
+      "v": 30,
+      "x": 31,
+      "y": 32,
+      "z": 33,
+      "á": 34,
+      "í": 35,
+      "ó": 36,
+      "ú": 37,
+      "en": 38,
+      "de": 39,
+      "ci": 40,
+      "ra": 41,
+      "es": 42,
+      "on": 43,
+      "pr": 44,
+      "al": 45,
+      "os": 46,
+      "te": 47,
+      "ca": 48,
+      "aj": 49,
+      "at": 50,
+      "gu": 51,
+      "or": 52,
+      "ti": 53,
+      "tra": 54,
+      "aje": 55,
+      "ad": 56,
+      "as": 57,
+      "er": 58,
+      "for": 59,
+      "len": 60,
+      "ma": 61,
+      "mo": 62,
+      "enci": 63,
+      "del": 64,
+      "guaje": 65,
+      "lenguaje": 66,
+      "El": 67,
+      "ab": 68,
+      "ar": 69,
+      "apr": 70,
+      "el": 71,
+      "fi": 72,
+      "ig": 73,
+      "in": 74,
+      "la": 75,
+      "ns": 76,
+      "pal": 77,
+      "re": 78,
+      "to": 79,
+      "un": 80,
+      "pro": 81,
+      "trans": 82,
+      "encia": 83,
+      "abra": 84,
+      "apren": 85,
+      "palabra": 86,
+      "transfor": 87,
+      "La": 88,
+      "am": 89,
+      "aci": 90,
+      "ces": 91,
+      "con": 92,
+      "di": 93,
+      "do": 94,
+      "dat": 95,
+      "dad": 96,
+      "ien": 97,
+      "los": 98,
+      "lig": 99,
+      "má": 100,
+      "mer": 101,
+      "ne": 102,
+      "ni": 103,
+      "qu": 104,
+      "ron": 105,
+      "us": 106,
+      "xto": 107,
+      "ón": 108,
+      "cial": 109,
+      "ales": 110,
+      "telig": 111,
+      "texto": 112,
+      "cap": 113,
+      "tifi": 114,
+      "model": 115,
+      "artifi": 116,
+      "intelig": 117,
+      "proces": 118,
+      "transformer": 119,
+      "contexto": 120,
+      "datos": 121,
+      "más": 122,
+      "que": 123,
+      "modelo": 124,
+      "artificial": 125,
+      "inteligencia": 126,
+      "procesam": 127,
+      "transformers": 128,
+      "Cad": 129,
+      "Los": 130,
+      "Las": 131,
+      "Py": 132,
+      "Un": 133,
+      "an": 134,
+      "ara": 135,
+      "ce": 136,
+      "ct": 137,
+      "cen": 138,
+      "cte": 139,
+      "den": 140,
+      "ex": 141,
+      "eca": 142,
+      "edi": 143,
+      "ect": 144,
+      "fas": 145,
+      "fun": 146,
+      "hu": 147,
+      "hon": 148,
+      "igu": 149,
+      "iales": 150,
+      "lu": 151,
+      "les": 152,
+      "lti": 153,
+      "las": 154,
+      "mú": 155,
+      "meca": 156,
+      "no": 157,
+      "nos": 158,
+      "nat": 159,
+      "nan": 160,
+      "olu": 161,
+      "pen": 162,
+      "pat": 163,
+      "para": 164,
+      "ples": 165,
+      "rí": 166,
+      "rnos": 167,
+      "su": 168,
+      "sti": 169,
+      "ser": 170,
+      "smo": 171,
+      "sig": 172,
+      "sigu": 173,
+      "taci": 174,
+      "thon": 175,
+      "ura": 176,
+      "uron": 177,
+      "vect": 178,
+      "volu": 179,
+      "zaje": 180,
+      "ene": 181,
+      "entaci": 182,
+      "des": 183,
+      "depen": 184,
+      "dernos": 185,
+      "cion": 186,
+      "ciencia": 187,
+      "ción": 188,
+      "cinan": 189,
+      "racte": 190,
+      "esentaci": 191,
+      "ones": 192,
+      "predi": 193,
+      "presentaci": 194,
+      "cas": 195,
+      "cado": 196,
+      "caracte": 197,
+      "atenci": 198,
+      "oriales": 199,
+      "tiene": 200,
+      "tral": 201,
+      "traer": 202,
+      "ado": 203,
+      "forma": 204,
+      "mane": 205,
+      "mano": 206,
+      "modernos": 207,
+      "aron": 208,
+      "ficado": 209,
+      "informa": 210,
+      "revolu": 211,
+      "redes": 212,
+      "representaci": 213,
+      "profun": 214,
+      "aprende": 215,
+      "aprendi": 216,
+      "aprenden": 217,
+      "palabras": 218,
+      "transforma": 219,
+      "acidad": 220,
+      "dado": 221,
+      "iente": 222,
+      "iento": 223,
+      "neuron": 224,
+      "nismo": 225,
+      "nificado": 226,
+      "rones": 227,
+      "usa": 228,
+      "usado": 229,
+      "capas": 230,
+      "capacidad": 231,
+      "procesamos": 232,
+      "procesamiento": 233,
+      "Cada": 234,
+      "Python": 235,
+      "central": 236,
+      "extraer": 237,
+      "fascinan": 238,
+      "humano": 239,
+      "ltiples": 240,
+      "múltiples": 241,
+      "mecanismo": 242,
+      "natura": 243,
+      "patrones": 244,
+      "rísti": 245,
+      "significado": 246,
+      "siguiente": 247,
+      "vectoriales": 248,
+      "depende": 249,
+      "cionaron": 250,
+      "predice": 251,
+      "característi": 252,
+      "atención": 253,
+      "manera": 254,
+      "información": 255,
+      "revolucionaron": 256,
+      "representaciones": 257,
+      "profundo": 258,
+      "aprendizaje": 259,
+      "neuronales": 260,
+      "fascinante": 261,
+      "natural": 262,
+      "características": 263
+    },
+    "merges": [
+      [
+        "e",
+        "n"
+      ],
+      [
+        "d",
+        "e"
+      ],
+      [
+        "c",
+        "i"
+      ],
+      [
+        "r",
+        "a"
+      ],
+      [
+        "e",
+        "s"
+      ],
+      [
+        "o",
+        "n"
+      ],
+      [
+        "p",
+        "r"
+      ],
+      [
+        "a",
+        "l"
+      ],
+      [
+        "o",
+        "s"
+      ],
+      [
+        "t",
+        "e"
+      ],
+      [
+        "c",
+        "a"
+      ],
+      [
+        "a",
+        "j"
+      ],
+      [
+        "a",
+        "t"
+      ],
+      [
+        "g",
+        "u"
+      ],
+      [
+        "o",
+        "r"
+      ],
+      [
+        "t",
+        "i"
+      ],
+      [
+        "t",
+        "ra"
+      ],
+      [
+        "aj",
+        "e"
+      ],
+      [
+        "a",
+        "d"
+      ],
+      [
+        "a",
+        "s"
+      ],
+      [
+        "e",
+        "r"
+      ],
+      [
+        "f",
+        "or"
+      ],
+      [
+        "l",
+        "en"
+      ],
+      [
+        "m",
+        "a"
+      ],
+      [
+        "m",
+        "o"
+      ],
+      [
+        "en",
+        "ci"
+      ],
+      [
+        "de",
+        "l"
+      ],
+      [
+        "gu",
+        "aje"
+      ],
+      [
+        "len",
+        "guaje"
+      ],
+      [
+        "E",
+        "l"
+      ],
+      [
+        "a",
+        "b"
+      ],
+      [
+        "a",
+        "r"
+      ],
+      [
+        "a",
+        "pr"
+      ],
+      [
+        "e",
+        "l"
+      ],
+      [
+        "f",
+        "i"
+      ],
+      [
+        "i",
+        "g"
+      ],
+      [
+        "i",
+        "n"
+      ],
+      [
+        "l",
+        "a"
+      ],
+      [
+        "n",
+        "s"
+      ],
+      [
+        "p",
+        "al"
+      ],
+      [
+        "r",
+        "e"
+      ],
+      [
+        "t",
+        "o"
+      ],
+      [
+        "u",
+        "n"
+      ],
+      [
+        "pr",
+        "o"
+      ],
+      [
+        "tra",
+        "ns"
+      ],
+      [
+        "enci",
+        "a"
+      ],
+      [
+        "ab",
+        "ra"
+      ],
+      [
+        "apr",
+        "en"
+      ],
+      [
+        "pal",
+        "abra"
+      ],
+      [
+        "trans",
+        "for"
+      ],
+      [
+        "L",
+        "a"
+      ],
+      [
+        "a",
+        "m"
+      ],
+      [
+        "a",
+        "ci"
+      ],
+      [
+        "c",
+        "es"
+      ],
+      [
+        "c",
+        "on"
+      ],
+      [
+        "d",
+        "i"
+      ],
+      [
+        "d",
+        "o"
+      ],
+      [
+        "d",
+        "at"
+      ],
+      [
+        "d",
+        "ad"
+      ],
+      [
+        "i",
+        "en"
+      ],
+      [
+        "l",
+        "os"
+      ],
+      [
+        "l",
+        "ig"
+      ],
+      [
+        "m",
+        "á"
+      ],
+      [
+        "m",
+        "er"
+      ],
+      [
+        "n",
+        "e"
+      ],
+      [
+        "n",
+        "i"
+      ],
+      [
+        "q",
+        "u"
+      ],
+      [
+        "r",
+        "on"
+      ],
+      [
+        "u",
+        "s"
+      ],
+      [
+        "x",
+        "to"
+      ],
+      [
+        "ó",
+        "n"
+      ],
+      [
+        "ci",
+        "al"
+      ],
+      [
+        "al",
+        "es"
+      ],
+      [
+        "te",
+        "lig"
+      ],
+      [
+        "te",
+        "xto"
+      ],
+      [
+        "ca",
+        "p"
+      ],
+      [
+        "ti",
+        "fi"
+      ],
+      [
+        "mo",
+        "del"
+      ],
+      [
+        "ar",
+        "tifi"
+      ],
+      [
+        "in",
+        "telig"
+      ],
+      [
+        "pro",
+        "ces"
+      ],
+      [
+        "transfor",
+        "mer"
+      ],
+      [
+        "con",
+        "texto"
+      ],
+      [
+        "dat",
+        "os"
+      ],
+      [
+        "má",
+        "s"
+      ],
+      [
+        "qu",
+        "e"
+      ],
+      [
+        "model",
+        "o"
+      ],
+      [
+        "artifi",
+        "cial"
+      ],
+      [
+        "intelig",
+        "encia"
+      ],
+      [
+        "proces",
+        "am"
+      ],
+      [
+        "transformer",
+        "s"
+      ],
+      [
+        "C",
+        "ad"
+      ],
+      [
+        "L",
+        "os"
+      ],
+      [
+        "L",
+        "as"
+      ],
+      [
+        "P",
+        "y"
+      ],
+      [
+        "U",
+        "n"
+      ],
+      [
+        "a",
+        "n"
+      ],
+      [
+        "a",
+        "ra"
+      ],
+      [
+        "c",
+        "e"
+      ],
+      [
+        "c",
+        "t"
+      ],
+      [
+        "c",
+        "en"
+      ],
+      [
+        "c",
+        "te"
+      ],
+      [
+        "d",
+        "en"
+      ],
+      [
+        "e",
+        "x"
+      ],
+      [
+        "e",
+        "ca"
+      ],
+      [
+        "e",
+        "di"
+      ],
+      [
+        "e",
+        "ct"
+      ],
+      [
+        "f",
+        "as"
+      ],
+      [
+        "f",
+        "un"
+      ],
+      [
+        "h",
+        "u"
+      ],
+      [
+        "h",
+        "on"
+      ],
+      [
+        "i",
+        "gu"
+      ],
+      [
+        "i",
+        "ales"
+      ],
+      [
+        "l",
+        "u"
+      ],
+      [
+        "l",
+        "es"
+      ],
+      [
+        "l",
+        "ti"
+      ],
+      [
+        "l",
+        "as"
+      ],
+      [
+        "m",
+        "ú"
+      ],
+      [
+        "m",
+        "eca"
+      ],
+      [
+        "n",
+        "o"
+      ],
+      [
+        "n",
+        "os"
+      ],
+      [
+        "n",
+        "at"
+      ],
+      [
+        "n",
+        "an"
+      ],
+      [
+        "o",
+        "lu"
+      ],
+      [
+        "p",
+        "en"
+      ],
+      [
+        "p",
+        "at"
+      ],
+      [
+        "p",
+        "ara"
+      ],
+      [
+        "p",
+        "les"
+      ],
+      [
+        "r",
+        "í"
+      ],
+      [
+        "r",
+        "nos"
+      ],
+      [
+        "s",
+        "u"
+      ],
+      [
+        "s",
+        "ti"
+      ],
+      [
+        "s",
+        "er"
+      ],
+      [
+        "s",
+        "mo"
+      ],
+      [
+        "s",
+        "ig"
+      ],
+      [
+        "s",
+        "igu"
+      ],
+      [
+        "t",
+        "aci"
+      ],
+      [
+        "t",
+        "hon"
+      ],
+      [
+        "u",
+        "ra"
+      ],
+      [
+        "u",
+        "ron"
+      ],
+      [
+        "v",
+        "ect"
+      ],
+      [
+        "v",
+        "olu"
+      ],
+      [
+        "z",
+        "aje"
+      ],
+      [
+        "en",
+        "e"
+      ],
+      [
+        "en",
+        "taci"
+      ],
+      [
+        "de",
+        "s"
+      ],
+      [
+        "de",
+        "pen"
+      ],
+      [
+        "de",
+        "rnos"
+      ],
+      [
+        "ci",
+        "on"
+      ],
+      [
+        "ci",
+        "encia"
+      ],
+      [
+        "ci",
+        "ón"
+      ],
+      [
+        "ci",
+        "nan"
+      ],
+      [
+        "ra",
+        "cte"
+      ],
+      [
+        "es",
+        "entaci"
+      ],
+      [
+        "on",
+        "es"
+      ],
+      [
+        "pr",
+        "edi"
+      ],
+      [
+        "pr",
+        "esentaci"
+      ],
+      [
+        "ca",
+        "s"
+      ],
+      [
+        "ca",
+        "do"
+      ],
+      [
+        "ca",
+        "racte"
+      ],
+      [
+        "at",
+        "enci"
+      ],
+      [
+        "or",
+        "iales"
+      ],
+      [
+        "ti",
+        "ene"
+      ],
+      [
+        "tra",
+        "l"
+      ],
+      [
+        "tra",
+        "er"
+      ],
+      [
+        "ad",
+        "o"
+      ],
+      [
+        "for",
+        "ma"
+      ],
+      [
+        "ma",
+        "ne"
+      ],
+      [
+        "ma",
+        "no"
+      ],
+      [
+        "mo",
+        "dernos"
+      ],
+      [
+        "ar",
+        "on"
+      ],
+      [
+        "fi",
+        "cado"
+      ],
+      [
+        "in",
+        "forma"
+      ],
+      [
+        "re",
+        "volu"
+      ],
+      [
+        "re",
+        "des"
+      ],
+      [
+        "re",
+        "presentaci"
+      ],
+      [
+        "pro",
+        "fun"
+      ],
+      [
+        "apren",
+        "de"
+      ],
+      [
+        "apren",
+        "di"
+      ],
+      [
+        "apren",
+        "den"
+      ],
+      [
+        "palabra",
+        "s"
+      ],
+      [
+        "transfor",
+        "ma"
+      ],
+      [
+        "aci",
+        "dad"
+      ],
+      [
+        "dad",
+        "o"
+      ],
+      [
+        "ien",
+        "te"
+      ],
+      [
+        "ien",
+        "to"
+      ],
+      [
+        "ne",
+        "uron"
+      ],
+      [
+        "ni",
+        "smo"
+      ],
+      [
+        "ni",
+        "ficado"
+      ],
+      [
+        "ron",
+        "es"
+      ],
+      [
+        "us",
+        "a"
+      ],
+      [
+        "us",
+        "ado"
+      ],
+      [
+        "cap",
+        "as"
+      ],
+      [
+        "cap",
+        "acidad"
+      ],
+      [
+        "procesam",
+        "os"
+      ],
+      [
+        "procesam",
+        "iento"
+      ],
+      [
+        "Cad",
+        "a"
+      ],
+      [
+        "Py",
+        "thon"
+      ],
+      [
+        "cen",
+        "tral"
+      ],
+      [
+        "ex",
+        "traer"
+      ],
+      [
+        "fas",
+        "cinan"
+      ],
+      [
+        "hu",
+        "mano"
+      ],
+      [
+        "lti",
+        "ples"
+      ],
+      [
+        "mú",
+        "ltiples"
+      ],
+      [
+        "meca",
+        "nismo"
+      ],
+      [
+        "nat",
+        "ura"
+      ],
+      [
+        "pat",
+        "rones"
+      ],
+      [
+        "rí",
+        "sti"
+      ],
+      [
+        "sig",
+        "nificado"
+      ],
+      [
+        "sigu",
+        "iente"
+      ],
+      [
+        "vect",
+        "oriales"
+      ],
+      [
+        "depen",
+        "de"
+      ],
+      [
+        "cion",
+        "aron"
+      ],
+      [
+        "predi",
+        "ce"
+      ],
+      [
+        "caracte",
+        "rísti"
+      ],
+      [
+        "atenci",
+        "ón"
+      ],
+      [
+        "mane",
+        "ra"
+      ],
+      [
+        "informa",
+        "ción"
+      ],
+      [
+        "revolu",
+        "cionaron"
+      ],
+      [
+        "representaci",
+        "ones"
+      ],
+      [
+        "profun",
+        "do"
+      ],
+      [
+        "aprendi",
+        "zaje"
+      ],
+      [
+        "neuron",
+        "ales"
+      ],
+      [
+        "fascinan",
+        "te"
+      ],
+      [
+        "natura",
+        "l"
+      ],
+      [
+        "característi",
+        "cas"
+      ]
+    ]
+  }
+}
