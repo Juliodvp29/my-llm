@@ -4,15 +4,9 @@ import torch.nn.functional as F
 import math
 
 
-# ══════════════════════════════════════════════════════════════════════
-#  MECANISMO DE ATENCIÓN (Scaled Dot-Product)
-#
-#  Cada token calcula Q, K, V y usa Q·K^T para medir relevancias entre pares.
-#  Luego aplica softmax y pondera los valores V para obtener una mezcla.
-#  Esta operación permite que cada token se informe del contexto.
-#
-#  Fórmula: Attention(Q, K, V) = softmax(Q·K^T / √d_k) · V
-# ══════════════════════════════════════════════════════════════════════
+# ----------------------------------------------------------------------
+# Auto-atención de producto escalar escalado (Scaled Dot-Product Attention)
+# ----------------------------------------------------------------------
 
 def scaled_dot_product_attention(
     Q: torch.Tensor,
@@ -29,21 +23,14 @@ def scaled_dot_product_attention(
     """
     d_k = Q.size(-1)
 
-    # Paso 1: puntuaciones de relevancia entre todos los pares de tokens
-    # (batch, heads, seq_len, seq_len)
+    # Similitud QK escalada por dimensión
     scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k)
 
-    # Paso 2: aplicar máscara causal si existe
-    # La máscara evita que el modelo "mire hacia adelante" — cuando
-    # predice el token en posición 3, no puede ver los tokens 4, 5, 6...
-    # Esto es fundamental: en entrenamiento ya sabemos toda la secuencia,
-    # pero el modelo debe aprender a predecir SIN hacer trampa.
+    # Enmascaramiento causal opcional
     if mask is not None:
         scores = scores.masked_fill(mask == 0, float('-inf'))
 
-    # Paso 3: softmax → cada fila suma 1.0
-    # Ahora cada token tiene una distribución de "cuánta atención"
-    # pone en cada otro token
+    # Distribución de atención mediante similitud softmax
     weights = F.softmax(scores, dim=-1)
 
     # Paso 4: suma ponderada de los valores
@@ -52,9 +39,9 @@ def scaled_dot_product_attention(
     return output, weights
 
 
-# ══════════════════════════════════════════════════════════════════════
-#  MULTI-HEAD ATTENTION
-# ══════════════════════════════════════════════════════════════════════
+# ----------------------------------------------------------------------
+# Auto-atención Multicabeza
+# ----------------------------------------------------------------------
 
 class MultiHeadAttention(nn.Module):
     """
@@ -128,9 +115,9 @@ class MultiHeadAttention(nn.Module):
         return output, attn_weights
 
 
-# ══════════════════════════════════════════════════════════════════════
-#  FEED FORWARD NETWORK 
-# ══════════════════════════════════════════════════════════════════════
+# ----------------------------------------------------------------------
+# Red Feed Forward
+# ----------------------------------------------------------------------
 
 class FeedForward(nn.Module):
     """
@@ -152,12 +139,12 @@ class FeedForward(nn.Module):
         return self.net(x)
 
 
-# ══════════════════════════════════════════════════════════════════════
-#  TEST
-# ══════════════════════════════════════════════════════════════════════
+# ----------------------------------------------------------------------
+# Prueba de componente
+# ----------------------------------------------------------------------
 
 if __name__ == "__main__":
-    print("Probando mecanismo de atención...\n")
+    print("Iniciando prueba de atención...\n")
 
     BATCH    = 2
     SEQ_LEN  = 10
@@ -165,7 +152,7 @@ if __name__ == "__main__":
     N_HEADS  = 4      # 4 cabezas × 16 dimensiones = 64
     D_FF     = 256    # 4 × d_model
 
-    # ── Atención multi-cabeza ──────────────────────────────────────────
+    # --- Atención multi-cabeza ---
     attn = MultiHeadAttention(d_model=D_MODEL, n_heads=N_HEADS)
 
     # Simulamos la salida del embedding como entrada
@@ -190,16 +177,16 @@ if __name__ == "__main__":
     print(f"  → posición 0: {w[0,0].item():.4f} (debe ser ~1.0)")
     print(f"  → posición 1: {w[0,1].item():.4f} (debe ser ~0.0 — enmascarado)")
 
-    # ── Feed Forward ───────────────────────────────────────────────────
+    # --- Feed Forward ---
     ff = FeedForward(d_model=D_MODEL, d_ff=D_FF)
     ff_out = ff(attn_out)
     print(f"\nSalida de FeedForward: {ff_out.shape}  (mismo shape, siempre)")
 
-    # ── Parámetros ─────────────────────────────────────────────────────
+    # --- Parámetros ---
     attn_params = sum(p.numel() for p in attn.parameters())
     ff_params   = sum(p.numel() for p in ff.parameters())
     print(f"\nParámetros en MultiHeadAttention: {attn_params:,}")
     print(f"Parámetros en FeedForward:        {ff_params:,}")
     print(f"Total estas dos capas:            {attn_params + ff_params:,}")
 
-    print("\nattention.py funciona correctamente")
+    print("\nVerificación de attention.py superada")

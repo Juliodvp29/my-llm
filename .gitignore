@@ -22,3 +22,6 @@ build/
 #txt
 *.log
 *.txt
+
+#jsonl
+dataset.jsonl

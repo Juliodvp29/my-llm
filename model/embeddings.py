@@ -3,13 +3,10 @@ import torch.nn as nn
 import math
 
 
-# ══════════════════════════════════════════════════════════════════════
-#  EMBEDDINGS
-#
-#  Asocian cada token ID con un vector de dimensión d_model.
-#  La tabla de embeddings (nn.Embedding) es un conjunto de parámetros
-#  entrenables que el modelo ajusta para representar similitudes semánticas.
-# ══════════════════════════════════════════════════════════════════════
+# ----------------------------------------------------------------------
+# Embeddings de Tokens
+# Mapeo proyectivo para representar secuencias de IDs en hiperespacio.
+# ----------------------------------------------------------------------
 
 class TokenEmbedding(nn.Module):
     """
@@ -39,13 +36,10 @@ class TokenEmbedding(nn.Module):
         return self.embedding(x) * math.sqrt(self.d_model)
 
 
-# ══════════════════════════════════════════════════════════════════════
-#  POSITIONAL ENCODING
-#
-#  Agrega una señal de posición (sin/cos) a los embeddings para que el
-#  modelo pueda distinguir el orden de los tokens sin aprender parámetros.
-#  Esta señal es determinista y se puede calcular para cualquier longitud.
-# ══════════════════════════════════════════════════════════════════════
+# ----------------------------------------------------------------------
+# Codificación Posicional
+# Inyección de señal sinusoidal para preservar posición temporal estática.
+# ----------------------------------------------------------------------
 
 class PositionalEncoding(nn.Module):
     """
@@ -95,10 +89,10 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
-# ══════════════════════════════════════════════════════════════════════
-#  MÓDULO COMBINADO
-#  En la práctica siempre usamos ambos juntos, así que los unimos.
-# ══════════════════════════════════════════════════════════════════════
+# ----------------------------------------------------------------------
+# Módulo Híbrido de Embeddings
+# Interfaz completa integrando embeddings de tokens y posicionales.
+# ----------------------------------------------------------------------
 
 class TransformerEmbedding(nn.Module):
     """
@@ -120,12 +114,12 @@ class TransformerEmbedding(nn.Module):
         return self.pos_enc(self.token_emb(x))
 
 
-# ══════════════════════════════════════════════════════════════════════
-#  TEST
-# ══════════════════════════════════════════════════════════════════════
+# ----------------------------------------------------------------------
+# Ejecución de prueba
+# ----------------------------------------------------------------------
 
 if __name__ == "__main__":
-    print("Probando embeddings...\n")
+    print("Prueba del módulo embeddings...\n")
 
     # Configuración de ejemplo
     VOCAB_SIZE = 264    # el vocabulario que construimos con el tokenizer
@@ -169,4 +163,4 @@ if __name__ == "__main__":
     print(f"\nParámetros entrenables en esta capa: {params:,}")
     print(f"  → la tabla de embeddings: {VOCAB_SIZE} × {D_MODEL} = {VOCAB_SIZE*D_MODEL:,}")
 
-    print("\nembeddings.py funciona correctamente")
+    print("\nVerificación de embeddings.py superada")
