@@ -1,17 +1,18 @@
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
-from tokenizers.pre_tokenizers import Whitespace
-import os
-import json
 from tokenizers.pre_tokenizers import ByteLevel
 from tokenizers.normalizers import NFKC
 from tokenizers.decoders import ByteLevel as ByteLevelDecoder
+import os
+import json
 
-# --- 0. Inicialización de Dataset ---
-# Crea un registro de ejemplo si el archivo no existe para evitar fallos iniciales.
+# ----------------------------------------------------------------------
+# 0. Verificación del dataset
+# ----------------------------------------------------------------------
 
 def ensure_dataset_exists(path: str = "data/dataset.jsonl"):
+    """Crea un registro mínimo si el dataset no existe, para evitar fallos en frío."""
     if os.path.exists(path):
         return
 
@@ -19,81 +20,141 @@ def ensure_dataset_exists(path: str = "data/dataset.jsonl"):
     ejemplo = (
         "Este es un dataset de ejemplo para inicializar el proceso. "
         "Ejecuta data/prepare.py para generar un dataset completo. "
-        "Este texto se repite para asegurar que haya suficientes tokens." 
+        "Este texto se repite para asegurar que haya suficientes tokens."
     )
-
     with open(path, "w", encoding="utf-8") as f:
         f.write(json.dumps({"text": ejemplo}, ensure_ascii=False) + "\n")
 
-    print(f"Archivo {path} inicializado. Ejecutar 'python data/prepare.py' para generar dataset completo.")
+    print(f"Archivo {path} inicializado. Ejecuta 'python data/prepare.py' primero.")
 
 
-# --- 1. Lectura de Dataset ---
-ensure_dataset_exists()
+# ----------------------------------------------------------------------
+# 1. Escritura del corpus de entrenamiento — sin cargar todo en RAM
+# ----------------------------------------------------------------------
+
+def escribir_corpus(dataset_path: str, corpus_path: str) -> int:
+    """
+    Convierte dataset.jsonl → texto_entrenamiento.txt línea a línea.
+    Evita construir un string gigante en memoria con join().
+    Devuelve el número de fragmentos escritos.
+    """
+    total = 0
+    with open(dataset_path, encoding="utf-8") as fin, \
+         open(corpus_path, "w", encoding="utf-8") as fout:
+        for linea in fin:
+            try:
+                texto = json.loads(linea)["text"]
+                fout.write(texto + "\n")
+                total += 1
+            except (json.JSONDecodeError, KeyError):
+                continue
+    return total
+
+
+# ----------------------------------------------------------------------
+# 2. Construcción y entrenamiento del tokenizer
+# ----------------------------------------------------------------------
+
+# Rutas
+DATASET_PATH = "data/dataset.jsonl"
+CORPUS_PATH  = "data/texto_entrenamiento.txt"
+OUTPUT_PATH  = "models/tokenizer.json"
 
 os.makedirs("data", exist_ok=True)
+os.makedirs("models", exist_ok=True)
 
-print("Leyendo dataset...")
-textos = []
-with open("data/dataset.jsonl", encoding="utf-8") as f:
-    for linea in f:
-        textos.append(json.loads(linea)["text"])
+ensure_dataset_exists(DATASET_PATH)
 
-with open("data/texto_entrenamiento.txt", "w", encoding="utf-8") as f:
-    f.write("\n".join(textos))
+print("Escribiendo corpus de entrenamiento...")
+n_fragmentos = escribir_corpus(DATASET_PATH, CORPUS_PATH)
+print(f"   {n_fragmentos:,} fragmentos listos para tokenizar")
 
-print(f"   {len(textos):,} fragmentos listos para tokenizar")
-
-# --- 2. Construcción y Entrenamiento ---
-tokens_especiales = [
-    "<pad>",
-    "<unk>",
-    "<bos>",
-    "<eos>",
-    "<sep>",
-    "<code>"
-]
+# Tokens especiales con propósito documentado:
+#   <pad>  — relleno para igualar longitud en batches
+#   <unk>  — token desconocido (fallback de BPE)
+#   <bos>  — inicio de secuencia (usado en train.py y generate.py)
+#   <eos>  — fin de secuencia (usado en train.py y generate.py)
+#   <sep>  — separador entre documentos concatenados (reservado)
+#   <code> — marca inicio de bloque de código (reservado para fine-tuning)
+TOKENS_ESPECIALES = ["<pad>", "<unk>", "<bos>", "<eos>", "<sep>", "<code>"]
 
 tokenizer = Tokenizer(BPE(unk_token="<unk>"))
-tokenizer.normalizer = NFKC()
+tokenizer.normalizer    = NFKC()
 tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=True)
-tokenizer.decoder = ByteLevelDecoder()
+tokenizer.decoder       = ByteLevelDecoder()
 
 trainer = BpeTrainer(
-    vocab_size=32000,
-    min_frequency=2,
-    special_tokens=tokens_especiales,
-    show_progress=True
+    vocab_size     = 32000,
+    min_frequency  = 10,
+    special_tokens = TOKENS_ESPECIALES,
+    show_progress  = True,
 )
 
 print("Entrenando tokenizer BPE...")
-tokenizer.train(files=["data/texto_entrenamiento.txt"], trainer=trainer)
-print(f"Tokenizer entrenado | Vocabulario: {tokenizer.get_vocab_size()} tokens")
+tokenizer.train(files=[CORPUS_PATH], trainer=trainer)
+vocab_size_real = tokenizer.get_vocab_size()
+print(f"Tokenizer entrenado | Vocabulario final: {vocab_size_real:,} tokens")
 
-# --- 3. Guardado ---
-os.makedirs("models", exist_ok=True)
-tokenizer.save("models/tokenizer.json")
-print("Tokenizer exportado a models/tokenizer.json")
+# Nota: el vocabulario real puede ser menor que vocab_size=32000 si el corpus
+# no tiene suficientes pares con min_frequency >= 10. Es normal.
 
-# --- 4. Verificación de Tokenización ---
-print("\n" + "-"*50)
+# ----------------------------------------------------------------------
+# 3. Guardado
+# ----------------------------------------------------------------------
+
+tokenizer.save(OUTPUT_PATH)
+print(f"Tokenizer exportado a {OUTPUT_PATH}")
+
+# ----------------------------------------------------------------------
+# 4. Verificación
+# ----------------------------------------------------------------------
+
+print("\n" + "-" * 50)
 print("Verificación de segmentación")
-print("-"*50)
+print("-" * 50)
 
 pruebas = [
+    # Código
     "function login(user, password)",
-    "El aprendizaje automático",
-    "import torch",
     "def calcular(a, b):",
+    "import torch",
+    "const usuario = await db.findOne({ id })",
+    # Español
+    "El aprendizaje automático",
+    "La inteligencia artificial es fascinante",
+    # Caracteres especiales y tildes
+    "implementación, función, árbol, índice",
 ]
 
 for frase in pruebas:
     encoded = tokenizer.encode(frase)
-    print(f"\nTexto:  '{frase}'")
-    print(f"Tokens: {encoded.tokens}")
-    print(f"Total:  {len(encoded.tokens)} tokens")
+    print(f"\nTexto:    '{frase}'")
+    print(f"Tokens:   {encoded.tokens}")
+    print(f"Total:    {len(encoded.tokens)} tokens")
+    # Verificar que el decoder reconstruye el texto original
+    reconstruido = tokenizer.decode(encoded.ids)
+    ok = "✓" if reconstruido.strip() == frase.strip() else "✗ DIFERENCIA"
+    print(f"Decode:   '{reconstruido.strip()}' {ok}")
 
+print("\n" + "-" * 50)
 vocab = tokenizer.get_vocab()
-print("\nIDs de tokens especiales:")
-for t in tokens_especiales:
-    print(f"   {t:6s} → ID {vocab[t]}")
+print("IDs de tokens especiales:")
+for t in TOKENS_ESPECIALES:
+    print(f"   {t:<8} → ID {vocab[t]}")
+
+# Verificación de consistencia con train.py
+print("\nVerificación de orden de tokens especiales:")
+esperados = {"<pad>": 0, "<unk>": 1, "<bos>": 2, "<eos>": 3}
+todo_ok = True
+for token, id_esperado in esperados.items():
+    id_real = vocab.get(token, -1)
+    estado  = "✓" if id_real == id_esperado else f"✗ (esperado {id_esperado}, obtenido {id_real})"
+    print(f"   {token:<8} → {estado}")
+    if id_real != id_esperado:
+        todo_ok = False
+
+if not todo_ok:
+    print("\n⚠ Los IDs no coinciden con lo esperado por train.py.")
+    print("  Revisa el orden de TOKENS_ESPECIALES o ajusta train.py.")
+else:
+    print("\n✓ IDs de tokens especiales consistentes con train.py.")

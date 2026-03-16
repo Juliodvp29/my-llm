@@ -36,14 +36,14 @@ CONFIG = {
     "vocab_size" : 32000,
     "d_model"    : 512,
     "n_heads"    : 8,      # d_model % n_heads == 0
-    "n_layers"   : 8,
-    "d_ff"       : 2048,   # 4 * d_model
+    "n_layers"   : 10,
+    "d_ff"       : 2560,   # 4 * d_model
     "max_len"    : 512,
     "dropout"    : 0.1,
 
     # Hiperparámetros de entrenamiento
     "batch_size"    : 16,
-    "epochs"        : 5,
+    "epochs"        : 7,
     "lr"            : 2e-4,
     "grad_clip"     : 1.0,
 
@@ -136,6 +136,7 @@ def entrenar_epoca(model, loader, optimizer, scheduler, config, epoca, total_epo
             logits.view(-1, config["vocab_size"]),
             targets.view(-1),
             ignore_index=pad_id,
+            label_smoothing=0.1,
         )
 
         # Backward pass
@@ -198,7 +199,9 @@ def evaluar(model, loader, config):
 # ----------------------------------------------------------------------
 
 if __name__ == "__main__":
-    torch.set_num_threads(os.cpu_count())
+    # i7-1355U tiene 2 P-cores y 8 E-cores. Fijamos 2 hilos para usar solo los P-cores reales.
+    torch.set_num_threads(2)
+    torch.set_num_interop_threads(2)
     print("Iniciando entrenamiento de MiniGPT\n")
     os.makedirs(CONFIG["checkpoint_dir"], exist_ok=True)
 
@@ -220,9 +223,9 @@ if __name__ == "__main__":
     )
 
     train_loader = DataLoader(train_ds, batch_size=CONFIG["batch_size"],
-                              shuffle=True,  drop_last=True)
+                              shuffle=True, drop_last=True, pin_memory=False)
     val_loader   = DataLoader(val_ds,   batch_size=CONFIG["batch_size"],
-                              shuffle=False, drop_last=True)
+                              shuffle=False, drop_last=True, pin_memory=False)
 
     print(f"\nDataset dividido:")
     print(f"Entrenamiento: {len(train_ds):,} ejemplos ({len(train_loader)} batches)")
@@ -243,11 +246,19 @@ if __name__ == "__main__":
         weight_decay=0.01,  # Regularización L2
     )
 
-    # Decaimiento del factor de aprendizaje (Cosine Annealing)
+    from torch.optim.lr_scheduler import LambdaLR
+
+    # Decaimiento del factor de aprendizaje (Cosine Annealing con Warmup)
     total_steps = len(train_loader) * CONFIG["epochs"]
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=total_steps, eta_min=1e-5
-    )
+    warmup_steps = 300
+    
+    def lr_lambda(step):
+        if step < warmup_steps:
+            return float(step) / warmup_steps
+        progress = (step - warmup_steps) / (total_steps - warmup_steps)
+        return max(0.05, 0.5 * (1 + math.cos(math.pi * progress)))
+
+    scheduler = LambdaLR(optimizer, lr_lambda)
 
     # --- Bucle de entrenamiento ---
     print("="*60)
@@ -285,14 +296,26 @@ if __name__ == "__main__":
         # Checkpointing
         if val_loss < mejor_val_loss:
             mejor_val_loss = val_loss
-            ruta = os.path.join(CONFIG["checkpoint_dir"], "best_model.pt")
+            ruta_best = os.path.join(CONFIG["checkpoint_dir"], "best_model.pt")
             torch.save({
                 "epoca"     : epoca,
                 "config"    : CONFIG,
                 "model_state": model.state_dict(),
                 "val_loss"  : val_loss,
-            }, ruta)
+            }, ruta_best)
             print(f"  Checkpoint guardado (val_loss={val_loss:.4f})")
+
+        # Guardar último estado de cada época siempre
+        ruta_last = os.path.join(CONFIG["checkpoint_dir"], "last_model.pt")
+        torch.save({
+            "epoca"     : epoca,
+            "config"    : CONFIG,
+            "model_state": model.state_dict(),
+            "optimizer" : optimizer.state_dict(),
+            "scheduler" : scheduler.state_dict(),
+            "val_loss"  : val_loss,
+        }, ruta_last)
+        print(f"  Último estado actualizado en época {epoca}")
 
         print(f"{'─'*60}\n")
 
