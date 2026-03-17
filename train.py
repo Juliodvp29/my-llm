@@ -44,28 +44,29 @@ else:
 # ======================================================================
 
 CONFIG = {
-    # ── Arquitectura (~110M parámetros, igual que GPT-2 medium) ────────────
+    # ── Arquitectura (~350M parámetros, estilo GPT-2 Large) ────────────
     # Cambia estos valores si quieres experimentar con tamaños distintos:
     #   Pequeño (~30M):  d_model=256, n_heads=8,  n_layers=6,  d_ff=1024
     #   Mediano (~60M):  d_model=512, n_heads=8,  n_layers=10, d_ff=2048
-    #   Grande  (~110M): d_model=768, n_heads=12, n_layers=12, d_ff=3072  ← este
+    #   Grande  (~110M): d_model=768, n_heads=12, n_layers=12, d_ff=3072
+    #   Extra Grande (~350M): d_model=1024, n_heads=16, n_layers=24, d_ff=4096  ← este
     "vocab_size" : 32000,   # se sobreescribe al cargar el tokenizer
-    "d_model"    : 768,
-    "n_heads"    : 12,
-    "n_layers"   : 12,
-    "d_ff"       : 3072,    # siempre 4 × d_model
+    "d_model"    : 1024,
+    "n_heads"    : 16,
+    "n_layers"   : 24,
+    "d_ff"       : 4096,    # siempre 4 × d_model
     "max_len"    : 512,
-    "dropout"    : 0.0,
+    "dropout"    : 0.1,     # Introducimos 10% dropout para regularizar ahora que hay más datos
 
     # ── Hiperparámetros de entrenamiento ───────────────────────────────────
-    # batch_size=16 + accumulation_steps=4 → batch efectivo de 64
-    # Si la VRAM se agota, baja batch_size a 8 (batch efectivo = 32)
-    "batch_size"         : 8,
-    "accumulation_steps" : 8,       # gradient accumulation
+    # Al aumentar el tamaño del modelo consumirá más VRAM, por lo que reducimos batch_size
+    # pero aumentamos accumulation_steps para mantener un batch efectivo grande.
+    "batch_size"         : 4,       # Bajado para evitar Out Of Memory (OOM)
+    "accumulation_steps" : 16,      # 4 * 16 = 64 batch efectivo
     "epochs"             : 3,       # 3 épocas caben bien en 12h de Colab
-    "lr"                 : 3e-4,    # un poco más alto que antes para compensar
+    "lr"                 : 1.5e-4,  # Tasa más baja para estabilizar modelos más grandes
     "grad_clip"          : 1.0,
-    "warmup_steps"       : 1000,     # más warmup para modelo más grande
+    "warmup_steps"       : 2000,    # Más warmup para permitir un buen inicio del modelo gigante
 
     # ── Rutas ──────────────────────────────────────────────────────────────
     # En Colab estas rutas apuntan a Google Drive (se configuran en el notebook)
