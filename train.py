@@ -49,21 +49,21 @@ CONFIG = {
     #   Pequeño (~30M):  d_model=256, n_heads=8,  n_layers=6,  d_ff=1024
     #   Mediano (~60M):  d_model=512, n_heads=8,  n_layers=10, d_ff=2048
     #   Grande  (~110M): d_model=768, n_heads=12, n_layers=12, d_ff=3072  ← este
-    "vocab_size" : 32000,   # se sobreescribe al cargar el tokenizer
-    "d_model"    : 768,
-    "n_heads"    : 12,
-    "n_layers"   : 12,
-    "d_ff"       : 3072,    # siempre 4 × d_model
+    "vocab_size" : 8000,   # se sobreescribe al cargar el tokenizer
+    "d_model"    : 512,
+    "n_heads"    : 8,
+    "n_layers"   : 10,
+    "d_ff"       : 2048,    # siempre 4 × d_model
     "max_len"    : 512,
     "dropout"    : 0.1,
 
     # ── Hiperparámetros de entrenamiento ───────────────────────────────────
     # batch_size=16 + accumulation_steps=4 → batch efectivo de 64
     # Si la VRAM se agota, baja batch_size a 8 (batch efectivo = 32)
-    "batch_size"         : 16,
+    "batch_size"         : 8,
     "accumulation_steps" : 4,       # gradient accumulation
-    "epochs"             : 4,       # 3 épocas caben bien en 12h de Colab
-    "lr"                 : 3e-4,    # un poco más alto que antes para compensar
+    "epochs"             : 3,       # 3 épocas caben bien en 12h de Colab
+    "lr"                 : 2e-4,    # un poco más alto que antes para compensar
     "grad_clip"          : 1.0,
     "warmup_steps"       : 500,     # más warmup para modelo más grande
 

@@ -55,10 +55,11 @@ from data.sources import IDS_LIBROS_GUTENBERG, ARTICULOS_WIKIPEDIA, REPOS_GITHUB
 
 # ── Límites de cada fuente ──────────────────────────────────────────────────
 # Ajusta estos valores según el espacio disponible y el tiempo que tengas.
-# En Colab con disco de ~100 GB puedes subir MC4 a 300_000 sin problema.
-MAX_MC4_FRAGMENTOS   = 200_000   # fragmentos de texto web en español (mc4)
-MAX_GITHUB_FRAGMENTOS = 100_000   # fragmentos de código de GitHub
-MAX_FRAGMENT_CHARS    = 1_800    # longitud máxima de cada fragmento (chars)
+MAX_WIKIPEDIA_ARTICULOS = 30       # Límite de artículos (útil para pruebas rápidas)
+MAX_GUTENBERG_LIBROS    = 10       # Límite de libros de Gutenberg
+MAX_OSCAR_FRAGMENTOS    = 10_000  # fragmentos de texto web en español (OSCAR)
+MAX_GITHUB_FRAGMENTOS   = 10_000  # fragmentos de código de GitHub
+MAX_FRAGMENT_CHARS      = 1_800    # longitud máxima de cada fragmento (chars)
 
 
 # ======================================================================
@@ -247,7 +248,9 @@ def procesar_wikipedia_con_hilos():
         except (json.JSONDecodeError, ValueError):
             logger.warning("wikipedia_descargados.json corrupto, empezando desde cero.")
 
-    pendientes = [t for t in ARTICULOS_WIKIPEDIA if t not in articulos_descargados]
+    limite_wiki = MAX_WIKIPEDIA_ARTICULOS if MAX_WIKIPEDIA_ARTICULOS is not None else len(ARTICULOS_WIKIPEDIA)
+    articulos_objetivo = ARTICULOS_WIKIPEDIA[:limite_wiki]
+    pendientes = [t for t in articulos_objetivo if t not in articulos_descargados]
 
     if not pendientes:
         ruta = os.path.join(CACHE_DIR, f"{NOMBRE_CACHE}.jsonl")
@@ -257,7 +260,7 @@ def procesar_wikipedia_con_hilos():
 
     logger.info(
         f"Iniciando extraccion de Wikipedia "
-        f"({len(pendientes)} pendientes de {len(ARTICULOS_WIKIPEDIA)})..."
+        f"({len(pendientes)} pendientes de un total de {limite_wiki})..."
     )
 
     total_frag = 0
@@ -361,7 +364,9 @@ def procesar_gutenberg():
         except (json.JSONDecodeError, ValueError):
             pass
 
-    pendientes = [bid for bid in IDS_LIBROS_GUTENBERG
+    limite_gut = MAX_GUTENBERG_LIBROS if MAX_GUTENBERG_LIBROS is not None else len(IDS_LIBROS_GUTENBERG)
+    libros_objetivo = IDS_LIBROS_GUTENBERG[:limite_gut]
+    pendientes = [bid for bid in libros_objetivo
                   if bid not in libros_descargados]
 
     if not pendientes:
@@ -372,7 +377,7 @@ def procesar_gutenberg():
 
     logger.info(
         f"Descargando libros de Gutenberg "
-        f"({len(pendientes)} pendientes de {len(IDS_LIBROS_GUTENBERG)})..."
+        f"({len(pendientes)} pendientes de un total de {limite_gut})..."
     )
     total_frag = 0
     buffer: list[str] = []
@@ -474,7 +479,7 @@ def procesar_repositorios_locales():
     total_frag = 0
     buffer: list[str] = []
     archivos_procesados = archivos_saltados = 0
-    MAX_FRAGMENTOS_LOCAL = 250_000
+    MAX_FRAGMENTOS_LOCAL = 10_000
 
     for ruta_base in rutas_existentes:
         for root, dirs, files in os.walk(ruta_base):
@@ -523,30 +528,30 @@ def procesar_repositorios_locales():
 
 
 # ======================================================================
-# FUENTE 4 — HUGGING FACE mc4 (texto web en español)
+# FUENTE 4 — HUGGING FACE OSCAR (texto web en español)
 # Usa streaming para NO descargar el dataset completo a disco.
-# El dataset mc4 pesa cientos de GB, pero con streaming tomamos solo
+# El dataset OSCAR pesa cientos de GB, pero con streaming tomamos solo
 # lo que necesitamos y luego paramos.
 # ======================================================================
 
-def procesar_mc4_spanish():
+def procesar_oscar_spanish():
     """
-    Descarga fragmentos del dataset mc4 (español) desde Hugging Face
+    Descarga fragmentos del dataset OSCAR (español) desde Hugging Face
     usando streaming — nunca descarga el dataset completo.
 
     Requiere: pip install datasets
     """
-    NOMBRE_CACHE = "mc4_spanish"
+    NOMBRE_CACHE = "oscar_spanish"
 
     if cache_existe(NOMBRE_CACHE):
         ruta = os.path.join(CACHE_DIR, f"{NOMBRE_CACHE}.jsonl")
         n    = sum(1 for _ in open(ruta, encoding='utf-8'))
-        logger.info(f"mc4 español: cache encontrada ({n:,} fragmentos). Saltando.")
+        logger.info(f"OSCAR español: cache encontrada ({n:,} fragmentos). Saltando.")
         return n
 
     logger.info(
-        f"Iniciando descarga de mc4 español via streaming "
-        f"(limite: {MAX_MC4_FRAGMENTOS:,} fragmentos)..."
+        f"Iniciando descarga de OSCAR español via streaming "
+        f"(limite: {MAX_OSCAR_FRAGMENTOS:,} fragmentos)..."
     )
 
     try:
@@ -563,15 +568,14 @@ def procesar_mc4_spanish():
     docs_procesados = docs_saltados = 0
 
     try:
-        # trust_remote_code=False es suficiente para mc4
-        # split="train" es el único split disponible en mc4
+        # trust_remote_code=True sugerido para datasets nuevos en HF
         # La opción streaming=True es la clave: descarga bloque a bloque
         dataset = load_dataset(
-            "mc4",
+            "oscar-corpus/OSCAR-2301",
             "es",                # subconjunto en español
             split="train",
             streaming=True,
-            trust_remote_code=False,
+            trust_remote_code=True,
         )
 
         for doc in dataset:
@@ -596,7 +600,7 @@ def procesar_mc4_spanish():
             frags = fragmentar_por_parrafos(texto_limpio)
 
             for frag in frags:
-                if total_frag >= MAX_MC4_FRAGMENTOS:
+                if total_frag >= MAX_OSCAR_FRAGMENTOS:
                     break
                 buffer.append(frag)
                 total_frag += 1
@@ -608,28 +612,29 @@ def procesar_mc4_spanish():
                 guardar_en_cache(buffer, NOMBRE_CACHE)
                 buffer = []
                 logger.info(
-                    f"  [mc4] {docs_procesados:,} docs procesados | "
-                    f"Fragmentos: {total_frag:,}/{MAX_MC4_FRAGMENTOS:,}"
+                    f"  [OSCAR] {docs_procesados:,} docs procesados | "
+                    f"Fragmentos: {total_frag:,}/{MAX_OSCAR_FRAGMENTOS:,}"
                 )
 
-            if total_frag >= MAX_MC4_FRAGMENTOS:
+            if total_frag >= MAX_OSCAR_FRAGMENTOS:
                 logger.info(
-                    f"  Limite de {MAX_MC4_FRAGMENTOS:,} fragmentos alcanzado."
+                    f"  Limite de {MAX_OSCAR_FRAGMENTOS:,} fragmentos alcanzado."
                 )
                 break
 
     except Exception as e:
-        logger.error(f"Error al procesar mc4: {e}")
+        logger.error(f"Error al procesar OSCAR: {e}")
 
     finally:
         # Guardamos lo que quede en el buffer
         guardar_en_cache(buffer, NOMBRE_CACHE)
 
     logger.info(
-        f"mc4 español: {docs_procesados:,} documentos procesados, "
+        f"OSCAR español: {docs_procesados:,} documentos procesados, "
         f"{docs_saltados:,} saltados, {total_frag:,} fragmentos guardados."
     )
     return total_frag
+
 
 
 # ======================================================================
@@ -817,7 +822,7 @@ def generar_dataset_completo():
     logger.info("Si interrumpes y reinicias, el progreso se conserva.")
     logger.info("=" * 60)
 
-    frag_wiki = frag_gutenberg = frag_local = frag_mc4 = frag_github = 0
+    frag_wiki = frag_gutenberg = frag_local = frag_oscar = frag_github = 0
 
     try:
         # Fuente 1 — Wikipedia
@@ -832,8 +837,8 @@ def generar_dataset_completo():
         frag_local     = procesar_repositorios_locales()
         logger.info("-" * 60)
 
-        # Fuente 4 — mc4 español (Hugging Face, streaming)
-        frag_mc4       = procesar_mc4_spanish()
+        # Fuente 4 — OSCAR español (Hugging Face, streaming)
+        frag_oscar     = procesar_oscar_spanish()
         logger.info("-" * 60)
 
         # Fuente 5 — GitHub API (código sin clonar)
@@ -853,7 +858,7 @@ def generar_dataset_completo():
         logger.info(f"  Wikipedia:    {frag_wiki:,} fragmentos")
         logger.info(f"  Gutenberg:    {frag_gutenberg:,} fragmentos")
         logger.info(f"  Repos local:  {frag_local:,} fragmentos")
-        logger.info(f"  mc4 español:  {frag_mc4:,} fragmentos")
+        logger.info(f"  OSCAR español: {frag_oscar:,} fragmentos")
         logger.info(f"  GitHub API:   {frag_github:,} fragmentos")
         logger.info(f"  TOTAL:        {total:,} fragmentos en dataset.jsonl")
         logger.info(f"  Tiempo:       {tiempo:.1f}s ({tiempo/60:.1f} min)")

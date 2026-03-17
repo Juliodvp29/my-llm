@@ -1,16 +1,22 @@
 # IDs de libros en español de Project Gutenberg
-# 2000: Don Quijote, 14740: La tía Tula, 15124: La vida es sueño, etc.
 IDS_LIBROS_GUTENBERG = [
     2000, 11626, 11922, 11961, 12854, 13507, 13545, 13575, 13734, 13735,
     13876, 14438, 14507, 14740, 14765, 14856, 15006, 15124, 15151, 15462,
     15530, 15555, 15822, 15923, 16194, 16195, 16214, 16503, 16867, 16964,
     17077, 17150, 17223, 17316, 17478, 17513, 17540, 17772, 19602, 20000,
     20001, 20385, 31430, 32420, 33481, 34241, 35201, 36796, 43091, 67529,
-    14514, 15360, 15541, 16127, 21503, 15935, 15501
+    14514, 15360, 15541, 16127, 21503, 15935, 15501, 429, 425, 292, 291, 160, 152, 135, 134, 132, 131, 124, 123, 111,
+    108,
+    107, 103, 101, 100, 99, 85, 84, 83, 69, 68, 67, 66, 65, 64, 7818,
+    4283, 4157, 3824, 3748, 2240, 2045, 1839, 1766, 1534, 1231, 1179,
+    895, 723, 541, 445, 422, 352, 74704, 60510, 69873, 28542, 69948,
+    77072, 30175, 60884, 50027, 60927, 29078
+    # agregar 50 libros nuevos
 ]
 
-
-ARTICULOS_WIKIPEDIA =[
+# Lista de artículos de Wikipedia para descargar.
+# Nota: Puedes limitar cuántos se procesan en data/prepare.py usando MAX_WIKIPEDIA_ARTICULOS.
+ARTICULOS_WIKIPEDIA = [
     "Inferencia_bayesiana",
     "Descenso_del_gradiente",
     "Retropropagación",
@@ -807,7 +813,7 @@ ARTICULOS_WIKIPEDIA =[
     "Kanban",
     "DevOps",
     "Contratos_inteligentes",
-         "Computación_afectiva",
+    "Computación_afectiva",
     "Web_semántica",
     "Arquitectura_orientada_a_servicios",
     "Sistema_de_tipos",
@@ -984,11 +990,51 @@ ARTICULOS_WIKIPEDIA =[
     "Instalación_artística",
     "Performance",
     "Ecorregión",
-    "Corriente_marina"
+    "Corriente_marina",
+    # Astrofísica y Espacio
+    "Agujero_negro", "Horizonte_de_sucesos", "Relatividad_general", "Mecánica_cuántica",
+    "Big_Bang", "Galaxia", "Estrella_de_neutrones", "Radiación_de_Hawking", "Materia_oscura",
+    "Energía_oscura", "Vía_Láctea", "Nebulosa",
+    "Supernova", "Cosmología_física", "Exoplaneta", "Velocidad_de_la_luz",
+
+    # Computación y Gráficos
+    "Trazado_de_rayos", "Renderización", "Gráficos_3D_por_computadora", "GPU", "Sombreador",
+    "Inteligencia_artificial", "Aprendizaje_profundo", "Red_neuronal_artificial",
+    "Transformer_(modelo_de_aprendizaje_automático)", "Procesamiento_de_lenguaje_natural",
+    "Rust_(lenguaje_de_programación)", "C%2B%2B", "Compilador", "Arquitectura_de_computadores",
+    "Paralelismo_(informática)", "Multihilo", "Asincronía_(informática)",
+
+    # Desarrollo y Tecnología
+    "TypeScript", "JavaScript", "Framework_de_software", "Angular_(framework)",
+    "Desarrollo_de_aplicaciones_móviles", "API", "Base_de_datos", "SQL", "NoSQL",
+    "Computación_en_la_nube", "Git", "Interfaz_de_programación_de_aplicaciones",
+    "Interfaz_de_línea_de_comandos", "Protocolo_de_transferencia_de_hipertexto",
+    "Seguridad_informática", "Criptografía", "Blockchain", "Criptomoneda", "Contrato_inteligente",
+    "Finanzas_descentralizadas",
+    # agregando mas articulos de wikipedia en español que no estan en el array
+    "Computación_cuántica", "Lógica_difusa", "Teoría_de_grafos", "Criptografía_asimétrica",
+    "Firma_digital", "Sistema_de_nombres_de_dominio", "Dirección_IP", "Fibra_óptica",
+    "Hardware", "Periférico", "Software_libre", "Licencia_MIT", "Modelo_de_negocio",
+    "Propuesta_de_valor", "Capital_de_riesgo", "Producto_viable_mínimo", "Lean_startup",
+    "Marketing_digital", "Retorno_de_la_inversión", "Plan_de_negocio", "Sesgo_de_confirmación", "Disonancia_cognitiva",
+    "Método_científico",
+    "Pensamiento_crítico", "Toma_de_decisiones", "Gestión_del_tiempo", "Inteligencia_emocional", "Entropía",
+    "Leyes_de_la_termodinámica",
+    "Tabla_periódica_de_los_elementos", "Energía_renovable", "Placa_tectónica", "Atmósfera_terrestre", "Agujero_negro",
+    "Renacimiento_italiano", "Barroco", "Ilustración_(narrativa)", "Sociolingüística",
+    "Antropología_cultural", "Urbanismo", "Desarrollo_sostenible",
+    "Derecho_civil", "Trazado_de_rayos", "Computación_gráfica_3D", "Kotlin_(lenguaje_de_programación)",
+    "Aplicación_web_progresiva", "Comercio_electrónico", "Diseño_web_adaptable",
+    "Interfaz_de_usuario", "Experiencia_de_usuario", "WebAssembly", "Programación_asíncrona", "Programación_reactiva",
+    "Recolección_de_basura_(informática)", "Adquisición_de_segundas_lenguas", "Lingüística_aplicada",
+    "Fonología_del_inglés", "Enseñanza_de_idiomas",
+
+    # eliminar fallos y agregar 150 nuevos
 ]
 
+# triplicar para mas datos
 REPOS_GITHUB = [
- 
+
     # ── Python — Machine Learning / Data ────────────────────────────────────
     ("huggingface", "transformers", "main", [
         "src/transformers/modeling_utils.py",
@@ -1073,7 +1119,7 @@ REPOS_GITHUB = [
         "pydantic/validators.py",
         "pydantic/_internal/_model_construction.py",
     ]),
- 
+
     # ── TypeScript / JavaScript ──────────────────────────────────────────────
     ("microsoft", "TypeScript", "main", [
         "src/compiler/checker.ts",
@@ -1117,7 +1163,7 @@ REPOS_GITHUB = [
         "packages/client/src/runtime/getPrismaClient.ts",
         "packages/internals/src/engine-commands/getSchema.ts",
     ]),
- 
+
     # ── Rust ─────────────────────────────────────────────────────────────────
     ("rust-lang", "rust", "master", [
         "library/std/src/collections/hash/map.rs",
@@ -1149,7 +1195,7 @@ REPOS_GITHUB = [
         "actix-web/src/response/response.rs",
         "actix-web/src/middleware/logger.rs",
     ]),
- 
+
     # ── Go ───────────────────────────────────────────────────────────────────
     ("gin-gonic", "gin", "master", [
         "gin.go",
@@ -1158,7 +1204,7 @@ REPOS_GITHUB = [
         "tree.go",
         "middleware.go",
     ]),
- 
+
     # ── Infraestructura / DevOps ─────────────────────────────────────────────
     ("moby", "moby", "master", [
         "daemon/daemon.go",
@@ -1170,5 +1216,82 @@ REPOS_GITHUB = [
         "pkg/scheduler/scheduler.go",
         "pkg/kubelet/kubelet.go",
         "staging/src/k8s.io/api/core/v1/types.go",
+    ]),
+    # ── Bases de Datos / Almacenamiento ──────────────────────────────────────
+    ("redis", "redis", "unstable", [
+        "src/server.c",
+        "src/object.c",
+        "src/networking.c",
+        "src/evict.c",
+    ]),
+    ("supabase", "supabase", "master", [
+        "apps/www/lib/supabase.ts",
+        "packages/common/gotrue.ts",
+        "docker/docker-compose.yml",
+    ]),
+
+    # ── Herramientas de Desarrollo / VS Code ────────────────────────────────
+    ("microsoft", "vscode", "main", [
+        "src/vs/editor/common/model/textModel.ts",
+        "src/vs/platform/extensions/common/extensions.ts",
+        "src/vs/workbench/api/common/extHost.api.impl.ts",
+    ]),
+
+    # ── Web Standards / Testing ──────────────────────────────────────────────
+    ("cypress-io", "cypress", "develop", [
+        "packages/driver/src/cypress/cy.ts",
+        "packages/server/lib/project.js",
+        "packages/runner/src/main.tsx",
+    ]),
+
+    # ── Otros ─────────────────────────────────────────────────────────────
+    ("torvalds", "linux", "master", [
+        "kernel/sched/core.c",
+        "kernel/fork.c",
+        "kernel/exit.c",
+        "kernel/exec.c",
+    ]),
+
+    # ── Java ─────────────────────────────────────────────────────────────────
+    ("spring-projects", "spring-framework", "main", [
+        "spring-webmvc/src/main/java/org/springframework/web/servlet/DispatcherServlet.java",
+        "spring-core/src/main/java/org/springframework/core/env/Environment.java",
+    ]),
+    ("elastic", "elasticsearch", "main", [
+        "server/src/main/java/org/elasticsearch/node/Node.java",
+        "server/src/main/java/org/elasticsearch/cluster/ClusterState.java",
+    ]),
+
+    # ── C / C++ ──────────────────────────────────────────────────────────────
+    ("bitcoin", "bitcoin", "master", [
+        "src/validation.cpp",
+        "src/net.cpp",
+        "src/wallet/wallet.cpp",
+    ]),
+
+    # ── Más Python ───────────────────────────────────────────────────────────
+    ("django", "django", "main", [
+        "django/core/handlers/base.py",
+        "django/db/models/base.py",
+        "django/views/generic/base.py",
+    ]),
+    ("pandas-dev", "pandas", "main", [
+        "pandas/core/frame.py",
+        "pandas/core/series.py",
+    ]),
+
+    # ── Más TypeScript / JavaScript ──────────────────────────────────────────
+    ("vuejs", "core", "main", [
+        "packages/runtime-core/src/renderer.ts",
+        "packages/reactivity/src/reactive.ts",
+    ]),
+    ("tailwindlabs", "tailwindcss", "next", [
+        "packages/@tailwindcss-node/src/index.ts",
+    ]),
+
+    # ── Más Go ───────────────────────────────────────────────────────────────
+    ("golang", "go", "master", [
+        "src/net/http/server.go",
+        "src/fmt/print.go",
     ]),
 ]
