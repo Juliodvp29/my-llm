@@ -2124,6 +2124,11 @@ REPOS_GITHUB = [
         "src/transformers/trainer.py",
         "src/transformers/tokenization_utils.py",
         "src/transformers/configuration_utils.py",
+        "src/transformers/models/llama/modeling_llama.py",
+        "src/transformers/models/gpt2/modeling_gpt2.py",
+        "src/transformers/models/bert/modeling_bert.py",
+        "src/transformers/generation/utils.py",
+        "src/transformers/pipelines/base.py",
         "examples/pytorch/language-modeling/run_clm.py",
         "examples/pytorch/text-classification/run_glue.py",
     ]),
@@ -2131,9 +2136,13 @@ REPOS_GITHUB = [
         "torch/nn/modules/transformer.py",
         "torch/nn/modules/attention.py",
         "torch/optim/adam.py",
+        "torch/optim/sgd.py",
         "torch/optim/lr_scheduler.py",
         "torch/utils/data/dataset.py",
         "torch/utils/data/dataloader.py",
+        "torch/autograd/__init__.py",
+        "torch/jit/_recursive.py",
+        "torch/distributed/distributed_c10d.py",
     ]),
     ("karpathy", "minGPT", "master", [
         "mingpt/model.py",
@@ -2150,11 +2159,17 @@ REPOS_GITHUB = [
         "python/ray/worker.py",
         "python/ray/node.py",
         "python/ray/autoscaler/node_provider.py",
+        "python/ray/train/trainer.py",
+        "python/ray/serve/api.py",
+        "python/ray/dashboard/dashboard.py",
     ]),
     ("langchain-ai", "langchain", "main", [
         "libs/langchain/langchain/chains/base.py",
         "libs/langchain/langchain/llms/base.py",
         "libs/langchain/langchain/vectorstores/base.py",
+        "libs/langchain/langchain/agents/agent.py",
+        "libs/langchain/langchain/prompts/prompt.py",
+        "libs/langchain/langchain/memory/buffer.py",
     ]),
     ("run-llama", "llama_index", "main", [
         "llama-index-core/llama_index/core/indices/base.py",
@@ -2182,6 +2197,8 @@ REPOS_GITHUB = [
         "fastapi/routing.py",
         "fastapi/dependencies/utils.py",
         "fastapi/security/oauth2.py",
+        "fastapi/params.py",
+        "fastapi/responses.py",
         "docs_src/bigger_applications/app/main.py",
     ]),
     ("pallets", "flask", "main", [
@@ -2189,6 +2206,8 @@ REPOS_GITHUB = [
         "src/flask/routing.py",
         "src/flask/blueprints.py",
         "src/flask/testing.py",
+        "src/flask/sessions.py",
+        "src/flask/ctx.py",
     ]),
     ("sqlalchemy", "sqlalchemy", "main", [
         "lib/sqlalchemy/orm/session.py",
@@ -2206,12 +2225,16 @@ REPOS_GITHUB = [
     ("python", "cpython", "main", [
         "Lib/asyncio/tasks.py",
         "Lib/asyncio/events.py",
+        "Lib/asyncio/base_events.py",
         "Lib/collections/__init__.py",
         "Lib/functools.py",
         "Lib/itertools.py",
         "Lib/pathlib.py",
         "Lib/json/__init__.py",
         "Lib/logging/__init__.py",
+        "Lib/threading.py",
+        "Lib/multiprocessing/pool.py",
+        "Lib/typing.py",
     ]),
     ("pydantic", "pydantic", "main", [
         "pydantic/main.py",
@@ -2233,6 +2256,8 @@ REPOS_GITHUB = [
         "packages/next/src/client/router.ts",
         "packages/next/src/lib/router/utils/route-matcher.ts",
         "packages/next/src/server/base-server.ts",
+        "packages/next/src/build/index.ts",
+        "packages/next-swc/crates/core/src/lib.rs",
     ]),
     ("vitejs", "vite", "main", [
         "packages/vite/src/node/server/index.ts",
@@ -2378,6 +2403,9 @@ REPOS_GITHUB = [
         "src/vs/editor/common/model/textModel.ts",
         "src/vs/platform/extensions/common/extensions.ts",
         "src/vs/workbench/api/common/extHost.api.impl.ts",
+        "src/vs/editor/browser/view/viewPart.ts",
+        "src/vs/base/common/lifecycle.ts",
+        "src/vs/workbench/browser/layout.ts",
     ]),
 
     # ── Web Standards / Testing ──────────────────────────────────────────────
@@ -2393,6 +2421,9 @@ REPOS_GITHUB = [
         "kernel/fork.c",
         "kernel/exit.c",
         "kernel/exec.c",
+        "mm/memory.c",
+        "fs/read_write.c",
+        "net/ipv4/tcp.c",
     ]),
 
     # ── Java ─────────────────────────────────────────────────────────────────
@@ -2417,6 +2448,9 @@ REPOS_GITHUB = [
         "django/core/handlers/base.py",
         "django/db/models/base.py",
         "django/views/generic/base.py",
+        "django/contrib/admin/options.py",
+        "django/forms/models.py",
+        "django/urls/resolvers.py",
     ]),
     ("pandas-dev", "pandas", "main", [
         "pandas/core/frame.py",
@@ -2543,5 +2577,87 @@ REPOS_GITHUB = [
     ("ratatui-org", "ratatui", "main", [
         "src/terminal.rs",
     ]),
+    # ── Más Repos Populares (Batch 3) ─────────────────────────────────────────
+    ("freeCodeCamp", "freeCodeCamp", "main", [
+        "curriculum/challenges/english/01-responsive-web-design/basic-html-and-html5/say-hello-to-html-elements.md",
+        "api/src/server.ts",
+    ]),
+    ("TheAlgorithms", "Python", "master", [
+        "machine_learning/decision_tree.py",
+        "neural_network/back_propagation.py",
+    ]),
+    ("donnemartin", "system-design-primer", "master", [
+        "solutions/system_design/social_graph/README.md",
+    ]),
+    ("kamranahmedse", "developer-roadmap", "master", [
+        "src/components/Roadmap.tsx",
+    ]),
+    ("public-apis", "public-apis", "master", [
+        "scripts/validate.py",
+    ]),
+    ("EbookFoundation", "free-programming-books", "main", [
+        "free-programming-books-es.md",
+    ]),
+    ("ohmyzsh", "ohmyzsh", "master", [
+        "oh-my-zsh.sh",
+        "plugins/git/git.plugin.zsh",
+    ]),
+    ("home-assistant", "core", "dev", [
+        "homeassistant/core.py",
+        "homeassistant/components/light/__init__.py",
+    ]),
+    ("oscipv", "Cline", "main", [
+        "src/core/Cline.ts",
+    ]),
+    ("TabbyML", "tabby", "main", [
+        "crates/tabby/src/main.rs",
+    ]),
+    ("drizzle-team", "drizzle-orm", "main", [
+        "packages/drizzle-orm/src/pg-core/table.ts",
+    ]),
+    ("oven-sh", "bun", "main", [
+        "src/main.zig",
+        "src/bun.js/bindings/BunClient.cpp",
+    ]),
+    ("refined-github", "refined-github", "main", [
+        "source/refined-github.ts",
+    ]),
+    ("jwasham", "coding-interview-university", "main", [
+        "translations/README-es.md",
+    ]),
+    ("trekhleb", "javascript-algorithms", "master", [
+        "src/algorithms/math/fibonacci/fibonacci.js",
+    ]),
+    ("ryanmcdermott", "clean-code-javascript", "master", [
+        "README.md",
+    ]),
+    ("goldbergyoni", "nodebestpractices", "master", [
+        "README.md",
+    ]),
+    ("sindresorhus", "awesome", "main", [
+        "readme.md",
+    ]),
+    ("vinta", "awesome-python", "master", [
+        "README.md",
+    ]),
+    ("avelino", "awesome-go", "master", [
+        "README.md",
+    ]),
+    ("rust-unofficial", "awesome-rust", "main", [
+        "README.md",
+    ]),
+    ("josephmisiti", "awesome-machine-learning", "master", [
+        "README.md",
+    ]),
+    ("enaqx", "awesome-pentest", "master", [
+        "README.md",
+    ]),
+    ("Solido", "awesome-flutter", "master", [
+        "README.md",
+    ]),
+    ("dzharii", "awesome-typescript", "master", [
+        "README.md",
+    ]),
 ]
+
 

@@ -569,14 +569,15 @@ def procesar_oscar_spanish():
     docs_procesados = docs_saltados = 0
 
     try:
-        # trust_remote_code=True sugerido para datasets nuevos en HF
-        # La opción streaming=True es la clave: descarga bloque a bloque
+        # Usamos una versión anterior o un dataset similar que no sea gated si es posible
+        # o simplemente manejamos el error de autenticación con un mensaje claro.
+        logger.info("  Cargando OSCAR (es)...")
         dataset = load_dataset(
-            "oscar-corpus/OSCAR-2301",
-            "es",                # subconjunto en español
+            "oscar-corpus/OSCAR-2201", # Intentamos la versión 2201 que a veces es más accesible
+            "es",                
             split="train",
             streaming=True,
-            trust_remote_code=True,
+            trust_remote_code=True
         )
 
         for doc in dataset:
@@ -664,11 +665,9 @@ def procesar_dialogos_naturales():
     total_frag = 0
     buffer: list[str] = []
     
-    # Lista de datasets recomendados para lenguaje natural/diálogo en español
+    # Diálogos OpenSubtitles: Usamos el par 'en-es' y tomamos la columna 'es'
     datasets_config = [
-        # OpenSubtitles es excelente para diálogos coloquiales y fluidos
-        {"path": "opus_subtitles", "name": "es-es", "split": "train"},
-        # El corpus 'es_c4' o similares también son útiles si se filtran
+        {"path": "opus_subtitles", "name": "en-es", "split": "train"},
     ]
 
     for conf in datasets_config:
@@ -685,17 +684,17 @@ def procesar_dialogos_naturales():
                 trust_remote_code=True
             )
 
-            for i, doc in enumerate(dataset):
-                # Dependiendo del dataset, el campo puede ser 'text' o estar en 'translation'
-                if 'text' in doc:
-                    texto = doc['text']
-                elif 'translation' in doc:
-                    # En opus_subtitles, suele ser un par de traducción
+            for doc in dataset:
+                # En opus_subtitles los datos vienen en un dict 'translation'
+                # Ej: {'translation': {'en': 'Hello', 'es': 'Hola'}}
+                if 'translation' in doc:
                     texto = doc['translation'].get('es', '')
+                elif 'text' in doc:
+                    texto = doc['text']
                 else:
                     continue
 
-                if len(texto) < 60: # Diálogos muy cortos no aportan mucho contexto solo
+                if len(texto) < 40: # Diálogos un poco más cortos son aceptables
                     continue
 
                 texto_limpio = limpiar_texto_natural(texto)
