@@ -2187,9 +2187,27 @@ REPOS_GITHUB = [
     ("run-llama", "llama_index", "main", [
         "llama-index-core/llama_index/core/indices/base.py",
         "llama-index-core/llama_index/core/node_parser/interface.py",
+        "llama-index-core/llama_index/core/query_engine/retriever_query_engine.py",
+        "llama-index-integrations/llms/llama-index-llms-openai/llama_index/llms/openai/base.py",
+        "poetry.lock",
     ]),
     ("vllm-project", "vllm", "main", [
         "vllm/engine/llm_engine.py",
+        "vllm/model_executor/models/llama.py",
+        "vllm/sampling_params.py",
+        "vllm/entrypoints/api_server.py",
+    ]),
+    ("bentoml", "BentoML", "main", [
+        "src/bentoml/_internal/service/service.py",
+        "src/bentoml/_internal/models/model.py",
+    ]),
+    ("Significant-Gravitas", "AutoGPT", "master", [
+        "autogpt/agent/agent.py",
+        "autogpt/commands/command.py",
+    ]),
+    ("google", "jax", "main", [
+        "jax/_src/core.py",
+        "jax/_src/numpy/lax_numpy.py",
     ]),
     ("fastai", "fastai", "master", [
         "fastai/learner.py",
@@ -2366,12 +2384,28 @@ REPOS_GITHUB = [
         "routergroup.go",
         "tree.go",
         "middleware.go",
+        "render/render.go",
     ]),
     ("ollama", "ollama", "main", [
         "server/routes.go",
+        "app/lifecycle/lifecycle.go",
+        "api/types.go",
+        "llama/llama.go",
     ]),
     ("gohugoio", "hugo", "master", [
         "commands/hugo.go",
+        "tpl/tpl.go",
+        "hugolib/site.go",
+    ]),
+    ("prometheus", "prometheus", "main", [
+        "main.go",
+        "promql/engine.go",
+        "storage/remote/remote.go",
+    ]),
+    ("grafana", "grafana", "main", [
+        "pkg/api/api.go",
+        "pkg/services/sqlstore/sqlstore.go",
+        "pkg/middleware/middleware.go",
     ]),
 
     # ── Infraestructura / DevOps ─────────────────────────────────────────────
@@ -2385,6 +2419,18 @@ REPOS_GITHUB = [
         "pkg/scheduler/scheduler.go",
         "pkg/kubelet/kubelet.go",
         "staging/src/k8s.io/api/core/v1/types.go",
+        "pkg/apis/core/v1/validation/validation.go",
+        "cmd/kube-apiserver/app/server.go",
+    ]),
+    ("hashicorp", "vault", "main", [
+        "vault/logical_system.go",
+        "vault/core.go",
+        "sdk/helper/jsonutil/jsonutil.go",
+    ]),
+    ("hashicorp", "terraform", "main", [
+        "internal/command/apply.go",
+        "internal/terraform/context.py",
+        "internal/backend/local/backend.go",
     ]),
     # ── Bases de Datos / Almacenamiento ──────────────────────────────────────
     ("redis", "redis", "unstable", [
@@ -2593,7 +2639,7 @@ REPOS_GITHUB = [
         "src/layout.rs",
         "src/buffer.rs",
     ]),
-    # ── Batch 3 — IA & Agents ────────────────────────────────────────────────
+    # ── Batch 4 — Mas IA & Agentes ───────────────────────────────────────────
     ("FlowiseAI", "Flowise", "main", [
         "packages/server/src/index.ts",
         "packages/components/nodes/LLMs/OpenAI/OpenAI.ts",
@@ -2823,6 +2869,63 @@ REPOS_GITHUB = [
     ("opencv", "opencv", "4.x", [
         "modules/imgproc/src/color.cpp",
         "modules/core/src/matrix.cpp",
+    ]),
+    # ── Batch 12 — GenAI & Modern AI (2025) ───────────────────────────────────
+    ("mistralai", "mistral-common", "main", [
+        "src/mistral_common/tokens/tokenizers/base.py",
+    ]),
+    ("ollama", "ollama-python", "main", [
+        "ollama/_client.py",
+    ]),
+    ("comfyanonymous", "ComfyUI", "master", [
+        "main.py",
+        "nodes.py",
+        "execution.py",
+    ]),
+    ("RVC-Boss", "GPT-SoVITS", "main", [
+        "GPT_SoVITS/inference_webui.py",
+    ]),
+    ("ZDR0", "KAG", "main", [
+        "kag/common/base.py",
+    ]),
+    ("mem0ai", "mem0", "main", [
+        "mem0/core/main.py",
+    ]),
+    ("agno-ai", "agno", "main", [
+        "agno/agent/agent.py",
+    ]),
+    # ── Batch 13 — Web & UI Modern (2024-2025) ────────────────────────────────
+    ("shadcn-ui", "taxonomy", "main", [
+        "components/main-nav.tsx",
+    ]),
+    ("pmndrs", "react-three-fiber", "master", [
+        "packages/fiber/src/core/loop.ts",
+    ]),
+    ("framer", "motion", "main", [
+        "packages/framer-motion/src/motion/index.tsx",
+    ]),
+    ("facebook", "stylex", "main", [
+        "packages/stylex/src/stylex.js",
+    ]),
+    # ── Batch 14 — Mobile & Cross-platform ─────────────────────────────────────
+    ("expo", "expo", "main", [
+        "packages/expo/src/Expo.ts",
+    ]),
+    ("facebook", "react-native", "main", [
+        "ReactAndroid/src/main/java/com/facebook/react/ReactRootView.java",
+    ]),
+    ("desktop", "desktop", "development", [
+        "app/src/lib/git/core.ts",
+    ]),
+    # ── Batch 15 — Security & Tools ───────────────────────────────────────────
+    ("projectdiscovery", "nuclei", "main", [
+        "pkg/protocols/http/http.go",
+    ]),
+    ("rapid7", "metasploit-framework", "master", [
+        "lib/msf/core/exploit.rb",
+    ]),
+    ("sqlmapproject", "sqlmap", "master", [
+        "sqlmap.py",
     ]),
     # ── Más Repos Populares (Batch 3) ─────────────────────────────────────────
     ("freeCodeCamp", "freeCodeCamp", "main", [

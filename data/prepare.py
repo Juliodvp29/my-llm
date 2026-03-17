@@ -59,7 +59,7 @@ MAX_WIKIPEDIA_ARTICULOS = 0       # Límite de artículos (útil para pruebas r�
 MAX_GUTENBERG_LIBROS    = None       # Límite de libros de Gutenberg
 MAX_OSCAR_FRAGMENTOS    = 25_000  # fragmentos de texto web en español (OSCAR)
 MAX_DIALOGOS_FRAGMENTOS  = 120_000  # fragmentos de diálogos/conversaciones (HF)
-MAX_GITHUB_FRAGMENTOS   = 70_000  # fragmentos de código de GitHub
+MAX_GITHUB_FRAGMENTOS   = 80_000  # fragmentos de código de GitHub
 MAX_FRAGMENT_CHARS      = 2_000    # longitud máxima de cada fragmento (chars)
 
 
@@ -722,169 +722,163 @@ def procesar_dialogos_naturales():
 # usando la lista REPOS_GITHUB de sources.py
 # ======================================================================
 
-def _descargar_archivo_github(owner: str, repo: str,
-                               branch: str, path: str,
-                               max_retries: int = 3) -> str | None:
-    """
-    Descarga el contenido de un archivo de GitHub via raw URL.
-    Devuelve el texto del archivo o None si falla.
-    """
-    # raw.githubusercontent.com no requiere autenticación para repos públicos
-    url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}"
-    headers = {
-        'User-Agent': 'MiLLMDataBuilder/2.0 (aprendizaje, sin fines comerciales)'
-    }
 
-    for intento in range(max_retries):
-        try:
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=20) as response:
-                # Algunos archivos binarios (imágenes, etc.) hay que filtrarlos
-                content_type = response.headers.get('Content-Type', '')
-                if 'text' not in content_type and 'json' not in content_type:
-                    return None
-                return response.read().decode('utf-8', errors='ignore')
-
-        except urllib.error.HTTPError as e:
-            if e.code == 404:
-                # El archivo no existe en esa rama, no reintentar
-                return None
-            if e.code == 429:
-                # Rate limit de GitHub: esperamos más
-                wait = (2 ** intento) * 10 + random.uniform(0, 3)
-                logger.debug(f"  Rate limit GitHub ({owner}/{repo}). "
-                             f"Esperando {wait:.1f}s...")
-                time.sleep(wait)
-            else:
-                time.sleep((2 ** intento) * 2)
-
-        except (urllib.error.URLError, TimeoutError, OSError) as e:
-            wait = (2 ** intento) * 2 + random.uniform(0, 1)
-            logger.debug(f"  Error red {owner}/{repo}/{path}: {e}. "
-                         f"Reintento {intento+1}/{max_retries}...")
-            time.sleep(wait)
-
-        except Exception:
-            return None
-
-    return None
-
+# ======================================================================
+# FUENTE 5 — GITHUB API (Descargando ZIP del repositorio)
+# En lugar de fallar archivo por archivo, bajamos el zip completo de la
+# rama y seleccionamos archivos al azar.
+# ======================================================================
 
 def procesar_github_api():
     """
-    Descarga archivos de código de repos públicos de GitHub usando
-    raw.githubusercontent.com (sin clonar, sin autenticación).
-
-    La lista de repos y archivos viene de sources.REPOS_GITHUB.
+    Descarga repos públicos de GitHub como ZIP desde github.com/.../archive/...
+    Extrae al azar hasta 50 archivos válidos por repositorio.
+    Esto permite recolectar muchísimos fragmentos ignorando las rutas exactas.
     """
     NOMBRE_CACHE = "codigo_github"
 
-    # Caché granular: guardamos qué archivos ya descargamos para reanudar
-    cache_archivos_path = os.path.join(CACHE_DIR, "github_descargados.json")
-    archivos_descargados: set = set()
+    # Caché granular: guardamos qué repos ya descargamos para reanudar
+    cache_repos_path = os.path.join(CACHE_DIR, "github_descargados.json")
+    repos_descargados: set = set()
 
-    if os.path.exists(cache_archivos_path):
+    if os.path.exists(cache_repos_path):
         try:
-            with open(cache_archivos_path, 'r', encoding='utf-8') as f:
+            with open(cache_repos_path, 'r', encoding='utf-8') as f:
                 contenido = f.read().strip()
                 if contenido:
-                    archivos_descargados = set(json.loads(contenido))
+                    repos_descargados = set(json.loads(contenido))
         except (json.JSONDecodeError, ValueError):
             logger.warning("github_descargados.json corrupto, empezando desde cero.")
 
-    # Aplanamos la lista de repos en tareas individuales (owner, repo, branch, path)
-    tareas_totales = []
-    for owner, repo, branch, paths in REPOS_GITHUB:
-        for path in paths:
-            clave = f"{owner}/{repo}/{branch}/{path}"
-            if clave not in archivos_descargados:
-                tareas_totales.append((owner, repo, branch, path, clave))
+    total_frag = 0
+    ruta = os.path.join(CACHE_DIR, f"{NOMBRE_CACHE}.jsonl")
+    if os.path.exists(ruta):
+        total_frag = sum(1 for _ in open(ruta, encoding='utf-8'))
 
-    if not tareas_totales:
-        ruta = os.path.join(CACHE_DIR, f"{NOMBRE_CACHE}.jsonl")
-        n    = sum(1 for _ in open(ruta, encoding='utf-8')) if os.path.exists(ruta) else 0
-        logger.info(f"GitHub API: todos los archivos en cache ({n:,} fragmentos). Saltando.")
-        return n
+    if total_frag >= MAX_GITHUB_FRAGMENTOS:
+        logger.info(f"GitHub: Límite alcanzado o superado ({total_frag:,} frags). Saltando.")
+        return total_frag
 
     logger.info(
-        f"Descargando codigo de GitHub "
-        f"({len(tareas_totales)} archivos pendientes, "
-        f"limite {MAX_GITHUB_FRAGMENTOS:,} fragmentos)..."
+        f"Comenzando procesamiento de repos de GitHub "
+        f"(límite {MAX_GITHUB_FRAGMENTOS:,} fragmentos)..."
     )
 
-    total_frag = 0
     buffer: list[str] = []
     exitos = fallos = 0
 
-    def descargar_tarea(tarea):
-        owner, repo, branch, path, clave = tarea
-        # Pequeño delay aleatorio para no saturar la API
-        time.sleep(random.uniform(0.5, 1.2))
-        contenido = _descargar_archivo_github(owner, repo, branch, path)
-        return clave, path, contenido
+    import zipfile
+    import io
 
-    # 4 hilos: equilibrio entre velocidad y respeto a los límites de GitHub
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {
-            executor.submit(descargar_tarea, t): t
-            for t in tareas_totales
-        }
+    for owner, repo, branch, _ in REPOS_GITHUB:
+        if total_frag >= MAX_GITHUB_FRAGMENTOS:
+            logger.info("  Límite de fragmentos de GitHub alcanzado.")
+            break
 
-        for idx, future in enumerate(as_completed(futures), 1):
-            if total_frag >= MAX_GITHUB_FRAGMENTOS:
-                # Cancelamos los futures pendientes si llegamos al límite
-                for f in futures:
-                    f.cancel()
-                break
+        clave = f"{owner}/{repo}"
+        if clave in repos_descargados:
+            continue
 
+        logger.info(f"  [GitHub] Descargando ZIP de {owner}/{repo}...")
+
+        # Intentamos con la rama especificada, o main/master si falla
+        ramas_a_probar = [branch]
+        if branch not in ["main", "master"]:
+            ramas_a_probar.extend(["main", "master"])
+        elif branch == "main":
+            ramas_a_probar.append("master")
+        else:
+            ramas_a_probar.append("main")
+
+        zip_data = None
+        for b in ramas_a_probar:
+            url = f"https://github.com/{owner}/{repo}/archive/refs/heads/{b}.zip"
+            req = urllib.request.Request(url, headers={'User-Agent': 'MiLLMDataBuilder/2.0'})
             try:
-                clave, path, contenido = future.result()
+                with urllib.request.urlopen(req, timeout=30) as response:
+                    zip_data = response.read()
+                    break
+            except Exception:
+                pass
 
-                if contenido and len(contenido.strip()) > 100:
-                    # Detectamos la extensión para el prefijo
-                    ext = os.path.splitext(path)[1].lower()
-                    nombre_archivo = os.path.basename(path)
+        if not zip_data:
+            logger.warning(f"    X Falló descarga de {owner}/{repo}")
+            fallos += 1
+            continue
 
-                    limpio  = limpiar_codigo(contenido)
-                    prefijo = f"# Archivo: {nombre_archivo} (extension: {ext})\n\n"
-                    frags   = fragmentar_codigo(prefijo + limpio)
+        try:
+            with zipfile.ZipFile(io.BytesIO(zip_data)) as z:
+                # Filtrar solo archivos con extensiones válidas y no muy grandes
+                archivos_validos = []
+                for file_info in z.infolist():
+                    if file_info.is_dir() or file_info.file_size > 200_000:
+                        continue
+                    ext = os.path.splitext(file_info.filename)[1].lower()
+                    if ext in EXTENSIONES_VALIDAS:
+                        # Excluir paths de test, build, minificados, etc.
+                        fname = file_info.filename.lower()
+                        ignorar = ['/test/', '/tests/', '.min.', '/node_modules/', '/dist/', '/build/', '/out/', 'vendor/']
+                        if not any(ign in fname for ign in ignorar):
+                            archivos_validos.append(file_info)
 
-                    if frags:
-                        buffer.extend(frags)
-                        total_frag += len(frags)
-                        exitos     += 1
-                        archivos_descargados.add(clave)
+                # Tomamos algunos archivos al azar para que haya diversidad
+                random.shuffle(archivos_validos)
+                archivos_a_procesar = archivos_validos[:50]
+
+                repo_frags = 0
+                for file_info in archivos_a_procesar:
+                    try:
+                        contenido = z.read(file_info.filename).decode('utf-8', errors='ignore')
+                        if len(contenido.strip()) < 100:
+                            continue
+
+                        ext = os.path.splitext(file_info.filename)[1].lower()
+                        nombre_archivo = file_info.filename.split('/')[-1]
+
+                        limpio = limpiar_codigo(contenido)
+                        prefijo = f"# Repo: {owner}/{repo} | Archivo: {nombre_archivo}\n\n"
+                        frags = fragmentar_codigo(prefijo + limpio)
+
+                        if frags:
+                            buffer.extend(frags)
+                            total_frag += len(frags)
+                            repo_frags += len(frags)
+                    except Exception:
+                        pass
+
+                if repo_frags > 0:
+                    exitos += 1
+                    logger.info(f"    ✓ {owner}/{repo}: {repo_frags} fragmentos extraídos.")
                 else:
                     fallos += 1
+                    logger.info(f"    X {owner}/{repo}: Ningún fragmento extraído.")
 
-            except Exception as e:
-                fallos += 1
-                logger.debug(f"  Excepcion en future GitHub: {e}")
+        except Exception as e:
+            logger.warning(f"    X Error descomprimiendo {owner}/{repo}: {e}")
+            fallos += 1
 
-            # Guardamos caché cada 20 archivos
-            if idx % 20 == 0 or idx == len(tareas_totales):
-                guardar_en_cache(buffer, NOMBRE_CACHE)
-                buffer = []
-                with open(cache_archivos_path, 'w', encoding='utf-8') as f:
-                    json.dump(list(archivos_descargados), f, ensure_ascii=False)
+        repos_descargados.add(clave)
+        
+        # Guardar en disco para que no se pierda el progreso de memoria
+        guardar_en_cache(buffer, NOMBRE_CACHE)
+        buffer = []
+        with open(cache_repos_path, 'w', encoding='utf-8') as f:
+            json.dump(list(repos_descargados), f, ensure_ascii=False)
 
-            if idx % 10 == 0:
-                logger.info(
-                    f"  [GitHub] {idx}/{len(tareas_totales)} archivos | "
-                    f"Exitos: {exitos} | Fallos: {fallos} | "
-                    f"Fragmentos: {total_frag:,}"
-                )
+        # Pausa amable
+        time.sleep(2.0)
 
-    # Guardamos lo que quede
+    # Si terminamos o nos interrumpen, guardar buffer
     guardar_en_cache(buffer, NOMBRE_CACHE)
-    with open(cache_archivos_path, 'w', encoding='utf-8') as f:
-        json.dump(list(archivos_descargados), f, ensure_ascii=False)
+    with open(cache_repos_path, 'w', encoding='utf-8') as f:
+        json.dump(list(repos_descargados), f, ensure_ascii=False)
 
     logger.info(
-        f"GitHub API: {exitos} archivos exitosos, {fallos} fallidos, "
-        f"{total_frag:,} fragmentos."
+        f"GitHub ZIPs finalizado: {exitos} repos exitosos, {fallos} fallidos. "
+        f"Total fragmentos GitHub: {total_frag:,}"
     )
     return total_frag
+
 
 
 # ======================================================================
