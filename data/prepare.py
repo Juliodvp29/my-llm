@@ -55,11 +55,12 @@ from data.sources import IDS_LIBROS_GUTENBERG, ARTICULOS_WIKIPEDIA, REPOS_GITHUB
 
 # ── Límites de cada fuente ──────────────────────────────────────────────────
 # Ajusta estos valores según el espacio disponible y el tiempo que tengas.
-MAX_WIKIPEDIA_ARTICULOS = 30       # Límite de artículos (útil para pruebas rápidas)
-MAX_GUTENBERG_LIBROS    = 10       # Límite de libros de Gutenberg
-MAX_OSCAR_FRAGMENTOS    = 10_000  # fragmentos de texto web en español (OSCAR)
-MAX_GITHUB_FRAGMENTOS   = 10_000  # fragmentos de código de GitHub
-MAX_FRAGMENT_CHARS      = 1_800    # longitud máxima de cada fragmento (chars)
+MAX_WIKIPEDIA_ARTICULOS = None       # Límite de artículos (útil para pruebas rápidas)
+MAX_GUTENBERG_LIBROS    = None       # Límite de libros de Gutenberg
+MAX_OSCAR_FRAGMENTOS    = 25_000  # fragmentos de texto web en español (OSCAR)
+MAX_DIALOGOS_FRAGMENTOS  = 120_000  # fragmentos de diálogos/conversaciones (HF)
+MAX_GITHUB_FRAGMENTOS   = 70_000  # fragmentos de código de GitHub
+MAX_FRAGMENT_CHARS      = 2_000    # longitud máxima de cada fragmento (chars)
 
 
 # ======================================================================
@@ -636,6 +637,89 @@ def procesar_oscar_spanish():
     return total_frag
 
 
+# ======================================================================
+# FUENTE 4.1 — DIÁLOGOS Y LENGUAJE NATURAL (Hugging Face)
+# ======================================================================
+
+def procesar_dialogos_naturales():
+    """
+    Descarga fragmentos de datasets de diálogos y lenguaje hablado en español
+    para mejorar la fluidez y naturalidad del modelo.
+    """
+    NOMBRE_CACHE = "dialogos_naturales"
+
+    if cache_existe(NOMBRE_CACHE):
+        ruta = os.path.join(CACHE_DIR, f"{NOMBRE_CACHE}.jsonl")
+        n    = sum(1 for _ in open(ruta, encoding='utf-8'))
+        logger.info(f"Diálogos: cache encontrada ({n:,} fragmentos). Saltando.")
+        return n
+
+    logger.info(f"Iniciando descarga de diálogos en español (HF streaming)...")
+
+    try:
+        from datasets import load_dataset
+    except ImportError:
+        return 0
+
+    total_frag = 0
+    buffer: list[str] = []
+    
+    # Lista de datasets recomendados para lenguaje natural/diálogo en español
+    datasets_config = [
+        # OpenSubtitles es excelente para diálogos coloquiales y fluidos
+        {"path": "opus_subtitles", "name": "es-es", "split": "train"},
+        # El corpus 'es_c4' o similares también son útiles si se filtran
+    ]
+
+    for conf in datasets_config:
+        if total_frag >= MAX_DIALOGOS_FRAGMENTOS:
+            break
+            
+        try:
+            logger.info(f"  Cargando sub-dataset: {conf['path']} ({conf['name']})...")
+            dataset = load_dataset(
+                conf['path'], 
+                conf['name'], 
+                split=conf['split'], 
+                streaming=True,
+                trust_remote_code=True
+            )
+
+            for i, doc in enumerate(dataset):
+                # Dependiendo del dataset, el campo puede ser 'text' o estar en 'translation'
+                if 'text' in doc:
+                    texto = doc['text']
+                elif 'translation' in doc:
+                    # En opus_subtitles, suele ser un par de traducción
+                    texto = doc['translation'].get('es', '')
+                else:
+                    continue
+
+                if len(texto) < 60: # Diálogos muy cortos no aportan mucho contexto solo
+                    continue
+
+                texto_limpio = limpiar_texto_natural(texto)
+                # No usamos fragmentar por párrafos aquí porque los diálogos suelen ser cortos
+                buffer.append(texto_limpio)
+                total_frag += 1
+                
+                if total_frag % 1000 == 0:
+                    guardar_en_cache(buffer, NOMBRE_CACHE)
+                    buffer = []
+                    logger.info(f"    [Diálogos] {total_frag:,}/{MAX_DIALOGOS_FRAGMENTOS:,} fragmentos...")
+
+                if total_frag >= MAX_DIALOGOS_FRAGMENTOS:
+                    break
+
+        except Exception as e:
+            logger.warning(f"  Error cargando dataset de diálogos {conf['path']}: {e}")
+            continue
+
+    guardar_en_cache(buffer, NOMBRE_CACHE)
+    logger.info(f"Diálogos: {total_frag:,} fragmentos guardados para fluidez natural.")
+    return total_frag
+
+
 
 # ======================================================================
 # FUENTE 5 — GITHUB API (código sin clonar repos)
@@ -841,6 +925,10 @@ def generar_dataset_completo():
         frag_oscar     = procesar_oscar_spanish()
         logger.info("-" * 60)
 
+        # Fuente 4.1 — Diálogos Naturales
+        frag_dialogos  = procesar_dialogos_naturales()
+        logger.info("-" * 60)
+
         # Fuente 5 — GitHub API (código sin clonar)
         frag_github    = procesar_github_api()
         logger.info("-" * 60)
@@ -859,6 +947,7 @@ def generar_dataset_completo():
         logger.info(f"  Gutenberg:    {frag_gutenberg:,} fragmentos")
         logger.info(f"  Repos local:  {frag_local:,} fragmentos")
         logger.info(f"  OSCAR español: {frag_oscar:,} fragmentos")
+        logger.info(f"  Diálogos:     {frag_dialogos:,} fragmentos")
         logger.info(f"  GitHub API:   {frag_github:,} fragmentos")
         logger.info(f"  TOTAL:        {total:,} fragmentos en dataset.jsonl")
         logger.info(f"  Tiempo:       {tiempo:.1f}s ({tiempo/60:.1f} min)")
