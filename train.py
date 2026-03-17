@@ -1,7 +1,7 @@
 """
-train.py — Entrenamiento de MiniGPT (~110M parámetros)
-Optimizado para GPU (Colab T4) con Mixed Precision y Gradient Accumulation.
-También funciona en CPU (tu laptop) de forma automática, más lento pero igual.
+train.py — Entrenamiento de MiniGPT (~335M parámetros)
+Optimizado para 2x GPU T4 (Kaggle) con DataParallel, Mixed Precision y Gradient Accumulation.
+También funciona en 1 GPU o CPU de forma automática.
 """
 
 import torch
@@ -18,18 +18,14 @@ from model.transformer import MiniGPT
 
 # ======================================================================
 # DETECCIÓN DE DISPOSITIVO
-# Se detecta automáticamente: usa GPU si hay una disponible, si no CPU.
-# En Colab con GPU activada → "cuda", en tu laptop → "cpu"
 # ======================================================================
 
 DEVICE = (
     "cuda"  if torch.cuda.is_available()  else
-    "mps"   if torch.backends.mps.is_available() else  # Mac con Apple Silicon
+    "mps"   if torch.backends.mps.is_available() else
     "cpu"
 )
 
-# Mixed Precision solo tiene sentido en GPU CUDA
-# En CPU se desactiva automáticamente para evitar errores
 USE_AMP = (DEVICE == "cuda")
 
 print(f"Dispositivo: {DEVICE.upper()}")
@@ -38,6 +34,13 @@ if USE_AMP:
 else:
     print("Mixed Precision (FP16): desactivado (solo disponible en GPU CUDA)")
 
+# Detectar número de GPUs disponibles
+NUM_GPUS = torch.cuda.device_count() if DEVICE == "cuda" else 0
+if NUM_GPUS > 1:
+    print(f"GPUs detectadas: {NUM_GPUS} → Se usará DataParallel ⚡")
+elif NUM_GPUS == 1:
+    print(f"GPUs detectadas: 1")
+
 
 # ======================================================================
 # CONFIGURACIÓN
@@ -45,32 +48,25 @@ else:
 
 CONFIG = {
     # ── Arquitectura (~350M parámetros, estilo GPT-2 Large) ────────────
-    # Cambia estos valores si quieres experimentar con tamaños distintos:
-    #   Pequeño (~30M):  d_model=256, n_heads=8,  n_layers=6,  d_ff=1024
-    #   Mediano (~60M):  d_model=512, n_heads=8,  n_layers=10, d_ff=2048
-    #   Grande  (~110M): d_model=768, n_heads=12, n_layers=12, d_ff=3072
-    #   Extra Grande (~350M): d_model=1024, n_heads=16, n_layers=24, d_ff=4096  ← este
-    "vocab_size" : 32000,   # se sobreescribe al cargar el tokenizer
+    "vocab_size" : 32000,
     "d_model"    : 1024,
     "n_heads"    : 16,
     "n_layers"   : 24,
-    "d_ff"       : 4096,    # siempre 4 × d_model
+    "d_ff"       : 4096,
     "max_len"    : 512,
-    "dropout"    : 0.1,     # Introducimos 10% dropout para regularizar ahora que hay más datos
+    "dropout"    : 0.1,
 
-    # ── Hiperparámetros de entrenamiento ───────────────────────────────────
-    # Al aumentar el tamaño del modelo consumirá más VRAM, por lo que reducimos batch_size
-    # pero aumentamos accumulation_steps para mantener un batch efectivo grande.
-    "batch_size"         : 4,       # Bajado para evitar Out Of Memory (OOM)
-    "accumulation_steps" : 16,      # 4 * 16 = 64 batch efectivo
-    "epochs"             : 3,       # 3 épocas caben bien en 12h de Colab
-    "lr"                 : 1.5e-4,  # Tasa más baja para estabilizar modelos más grandes
+    # ── Hiperparámetros de entrenamiento ───────────────────────────────
+    # batch_size=8 con 2 GPUs: cada GPU procesa 4 ejemplos (igual que antes)
+    # accumulation_steps=8: 8 × 8 = 64 batch efectivo (igual que antes)
+    "batch_size"         : 8,       # ← CAMBIADO: 4→8 para aprovechar 2 GPUs
+    "accumulation_steps" : 8,       # ← CAMBIADO: 16→8, batch efectivo sigue siendo 64
+    "epochs"             : 3,
+    "lr"                 : 1.5e-4,
     "grad_clip"          : 1.0,
-    "warmup_steps"       : 2000,    # Más warmup para permitir un buen inicio del modelo gigante
+    "warmup_steps"       : 2000,
 
-    # ── Rutas ──────────────────────────────────────────────────────────────
-    # En Colab estas rutas apuntan a Google Drive (se configuran en el notebook)
-    # En tu laptop apuntan a las carpetas locales del proyecto
+    # ── Rutas ──────────────────────────────────────────────────────────
     "dataset_path"  : "data/dataset.jsonl",
     "tokenizer_path": "models/tokenizer.json",
     "checkpoint_dir": "models/checkpoints",
@@ -124,11 +120,9 @@ class TextDataset(Dataset):
                 saltados += 1
                 continue
 
-            # Truncar si es muy largo
             if len(ids) > max_len + 1:
                 ids = ids[:max_len + 1]
 
-            # Padding al final
             ids = ids + [pad_id] * (max_len + 1 - len(ids))
 
             self.examples.append((
@@ -146,34 +140,25 @@ class TextDataset(Dataset):
 
 
 # ======================================================================
-# ENTRENAMIENTO POR ÉPOCA — con Mixed Precision y Gradient Accumulation
+# ENTRENAMIENTO POR ÉPOCA
 # ======================================================================
 
 def entrenar_epoca(model, loader, optimizer, scheduler, scaler, config,
                    epoca, total_epocas, pad_id):
     model.train()
 
-    perdida_total   = 0.0
-    batches_vistos  = 0
+    perdida_total     = 0.0
+    batches_vistos    = 0
     tokens_procesados = 0
-    t_inicio        = time.time()
+    t_inicio          = time.time()
 
-    # Gradient accumulation: acumulamos gradientes durante N steps
-    # y solo actualizamos los pesos cada accumulation_steps batches.
-    # Esto simula un batch efectivo más grande sin usar más VRAM.
     accumulation_steps = config["accumulation_steps"]
     optimizer.zero_grad()
 
     for batch_idx, (inputs, targets) in enumerate(loader):
-        # Mover tensores al dispositivo (GPU o CPU)
         inputs  = inputs.to(DEVICE)
         targets = targets.to(DEVICE)
 
-        # ── Forward con Mixed Precision ────────────────────────────────
-        # torch.amp.autocast convierte automáticamente las operaciones
-        # más pesadas (matmul, conv) a FP16, manteniendo FP32 donde
-        # la precisión es crítica (softmax, layer norm).
-        # Si USE_AMP=False (CPU), el autocast es un no-op transparente.
         with torch.amp.autocast(device_type=DEVICE, enabled=USE_AMP):
             logits = model(inputs)
             loss   = nn.functional.cross_entropy(
@@ -182,23 +167,15 @@ def entrenar_epoca(model, loader, optimizer, scheduler, scaler, config,
                 ignore_index=pad_id,
                 label_smoothing=0.1,
             )
-            # Dividimos la loss por accumulation_steps para que el
-            # gradiente acumulado sea equivalente al de un batch grande
             loss_scaled = loss / accumulation_steps
 
-        # ── Backward con GradScaler ────────────────────────────────────
-        # El GradScaler multiplica la loss por un factor grande antes
-        # del backward para evitar underflow en FP16 (los gradientes
-        # pequeños se volverían cero). Luego descala antes del optimizer.
         if USE_AMP:
             scaler.scale(loss_scaled).backward()
         else:
             loss_scaled.backward()
 
-        # ── Actualización de pesos cada accumulation_steps ────────────
         if (batch_idx + 1) % accumulation_steps == 0:
             if USE_AMP:
-                # Descalar gradientes, aplicar grad_clip y actualizar
                 scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(
                     model.parameters(), config["grad_clip"]
@@ -224,12 +201,13 @@ def entrenar_epoca(model, loader, optimizer, scheduler, scaler, config,
             elapsed          = time.time() - t_inicio
             tok_per_sec      = tokens_procesados / elapsed
 
-            # Mostrar uso de VRAM si estamos en GPU
+            # Mostrar VRAM de todas las GPUs
             vram_info = ""
             if DEVICE == "cuda":
-                vram_used = torch.cuda.memory_allocated() / 1e9
-                vram_total = torch.cuda.get_device_properties(0).total_memory / 1e9
-                vram_info = f" | VRAM: {vram_used:.1f}/{vram_total:.1f}GB"
+                for i in range(NUM_GPUS):
+                    vram_used  = torch.cuda.memory_allocated(i) / 1e9
+                    vram_total = torch.cuda.get_device_properties(i).total_memory / 1e9
+                    vram_info += f" | GPU{i} VRAM: {vram_used:.1f}/{vram_total:.1f}GB"
 
             print(
                 f"  Época {epoca}/{total_epocas} | "
@@ -271,33 +249,31 @@ def evaluar(model, loader, config, pad_id):
 
 
 # ======================================================================
-# CHECKPOINT — reanudación desde el último estado guardado
+# CHECKPOINT
 # ======================================================================
 
 def cargar_checkpoint_si_existe(model, optimizer, scheduler, scaler,
                                  checkpoint_dir):
-    """
-    Si existe last_model.pt, restaura todos los estados y devuelve
-    (epoca_inicio, mejor_val_loss).
-    Si no existe, devuelve (1, inf) — arranque fresco.
-    """
     ruta = os.path.join(checkpoint_dir, "last_model.pt")
     if not os.path.exists(ruta):
         print("No se encontró checkpoint previo. Iniciando desde cero.\n")
         return 1, float('inf')
 
     print(f"Checkpoint encontrado en {ruta}. Reanudando...")
-    # map_location="cpu" primero para evitar problemas si cambia de GPU a CPU
     ck = torch.load(ruta, map_location="cpu")
 
-    model.load_state_dict(ck["model_state"])
-    model.to(DEVICE)  # mover al dispositivo correcto después de cargar
+    # ← CAMBIO: compatibilidad con DataParallel (.module)
+    state = ck["model_state"]
+    if isinstance(model, nn.DataParallel):
+        model.module.load_state_dict(state)
+    else:
+        model.load_state_dict(state)
+
+    model.to(DEVICE)
 
     optimizer.load_state_dict(ck["optimizer"])
     scheduler.load_state_dict(ck["scheduler"])
 
-    # El scaler solo existe cuando hay GPU, así que lo restauramos
-    # solo si el checkpoint lo tiene y estamos en GPU
     if USE_AMP and "scaler" in ck:
         scaler.load_state_dict(ck["scaler"])
 
@@ -317,8 +293,6 @@ def cargar_checkpoint_si_existe(model, optimizer, scheduler, scaler,
 # ======================================================================
 
 if __name__ == "__main__":
-    # En CPU: 2 hilos para los P-cores del i7
-    # En GPU: PyTorch gestiona los hilos automáticamente
     if DEVICE == "cpu":
         torch.set_num_threads(2)
         torch.set_num_interop_threads(2)
@@ -348,9 +322,8 @@ if __name__ == "__main__":
         generator=torch.Generator().manual_seed(42)
     )
 
-    # num_workers=2 en Colab (GPU) para cargar datos en paralelo
-    # num_workers=0 en CPU para evitar problemas en Windows
-    num_workers = 2 if DEVICE == "cuda" else 0
+    # ← CAMBIO: más workers para alimentar 2 GPUs sin cuellos de botella
+    num_workers = 4 if DEVICE == "cuda" else 0
 
     train_loader = DataLoader(
         train_ds,
@@ -358,7 +331,7 @@ if __name__ == "__main__":
         shuffle=True,
         drop_last=True,
         num_workers=num_workers,
-        pin_memory=(DEVICE == "cuda"),  # acelera transferencia CPU→GPU
+        pin_memory=(DEVICE == "cuda"),
     )
     val_loader = DataLoader(
         val_ds,
@@ -381,15 +354,21 @@ if __name__ == "__main__":
                         "d_ff", "max_len", "dropout"]})
     model = model.to(DEVICE)
 
+    # ← NUEVO: activar DataParallel si hay más de 1 GPU
+    if DEVICE == "cuda" and NUM_GPUS > 1:
+        print(f"Activando DataParallel en {NUM_GPUS} GPUs ⚡")
+        model = nn.DataParallel(model)
+
     total_params = sum(p.numel() for p in model.parameters())
     print(f"Modelo inicializado | Parámetros: {total_params:,}\n")
 
     # ── Optimizador ────────────────────────────────────────────────────
-    # Separamos los parámetros con y sin weight decay
-    # Los biases y LayerNorm no deben tener decay (práctica estándar)
-    decay_params    = [p for n, p in model.named_parameters()
+    # ← CAMBIO: acceder a model.module si es DataParallel
+    base_model = model.module if isinstance(model, nn.DataParallel) else model
+
+    decay_params    = [p for n, p in base_model.named_parameters()
                        if p.requires_grad and p.dim() >= 2]
-    no_decay_params = [p for n, p in model.named_parameters()
+    no_decay_params = [p for n, p in base_model.named_parameters()
                        if p.requires_grad and p.dim() < 2]
 
     optimizer = torch.optim.AdamW(
@@ -398,7 +377,7 @@ if __name__ == "__main__":
             {"params": no_decay_params, "weight_decay": 0.0},
         ],
         lr=CONFIG["lr"],
-        betas=(0.9, 0.95),  # betas ligeramente ajustados para modelos grandes
+        betas=(0.9, 0.95),
         eps=1e-8,
     )
 
@@ -408,21 +387,17 @@ if __name__ == "__main__":
 
     def lr_lambda(step):
         if step < warmup_steps:
-            # Warmup lineal: el LR sube gradualmente para estabilizar
-            # las primeras actualizaciones del modelo grande
             return float(step) / max(warmup_steps, 1)
         progress = (step - warmup_steps) / max(total_steps - warmup_steps, 1)
-        # Cosine decay: baja suavemente hasta el 10% del LR máximo
         return max(0.1, 0.5 * (1.0 + math.cos(math.pi * progress)))
 
     from torch.optim.lr_scheduler import LambdaLR
     scheduler = LambdaLR(optimizer, lr_lambda)
 
-    # ── GradScaler para Mixed Precision ────────────────────────────────
-    # Si USE_AMP=False (CPU), el scaler está desactivado y no hace nada
+    # ── GradScaler ─────────────────────────────────────────────────────
     scaler = torch.amp.GradScaler(enabled=USE_AMP)
 
-    # ── Reanudar desde checkpoint si existe ────────────────────────────
+    # ── Reanudar desde checkpoint ──────────────────────────────────────
     epoca_inicio, mejor_val_loss = cargar_checkpoint_si_existe(
         model, optimizer, scheduler, scaler, CONFIG["checkpoint_dir"]
     )
@@ -434,6 +409,8 @@ if __name__ == "__main__":
     # ── Bucle principal ────────────────────────────────────────────────
     print("=" * 60)
     print(f"Iniciando entrenamiento en {DEVICE.upper()}")
+    if NUM_GPUS > 1:
+        print(f"Usando {NUM_GPUS} GPUs con DataParallel")
     print(f"Épocas: {epoca_inicio} → {CONFIG['epochs']}")
     print(f"Batch size: {CONFIG['batch_size']}  |  "
           f"Acumulación: {CONFIG['accumulation_steps']}  |  "
@@ -441,8 +418,8 @@ if __name__ == "__main__":
     print(f"LR máximo: {CONFIG['lr']}  |  Warmup: {warmup_steps} steps")
     print("=" * 60)
 
-    historial  = []
-    t_total    = time.time()
+    historial = []
+    t_total   = time.time()
 
     for epoca in range(epoca_inicio, CONFIG["epochs"] + 1):
         t_ep = time.time()
@@ -473,20 +450,24 @@ if __name__ == "__main__":
         if val_loss < mejor_val_loss:
             mejor_val_loss = val_loss
             ruta_best = os.path.join(CONFIG["checkpoint_dir"], "best_model.pt")
+            # ← CAMBIO: guardar model.module si es DataParallel
+            state_dict = model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict()
             torch.save({
                 "epoca"      : epoca,
                 "config"     : CONFIG,
-                "model_state": model.state_dict(),
+                "model_state": state_dict,
                 "val_loss"   : val_loss,
             }, ruta_best)
             print(f"  ★ Mejor modelo guardado (val_loss={val_loss:.4f})")
 
-        # ── Guardar último estado completo (para reanudar) ────────────
+        # ── Guardar último estado completo ────────────────────────────
         ruta_last = os.path.join(CONFIG["checkpoint_dir"], "last_model.pt")
+        # ← CAMBIO: guardar model.module si es DataParallel
+        state_dict = model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict()
         checkpoint = {
             "epoca"         : epoca,
             "config"        : CONFIG,
-            "model_state"   : model.state_dict(),
+            "model_state"   : state_dict,
             "optimizer"     : optimizer.state_dict(),
             "scheduler"     : scheduler.state_dict(),
             "val_loss"      : val_loss,
