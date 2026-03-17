@@ -55,7 +55,7 @@ from data.sources import IDS_LIBROS_GUTENBERG, ARTICULOS_WIKIPEDIA, REPOS_GITHUB
 
 # ── Límites de cada fuente ──────────────────────────────────────────────────
 # Ajusta estos valores según el espacio disponible y el tiempo que tengas.
-MAX_WIKIPEDIA_ARTICULOS = None       # Límite de artículos (útil para pruebas rápidas)
+MAX_WIKIPEDIA_ARTICULOS = 0       # Límite de artículos (útil para pruebas rápidas)
 MAX_GUTENBERG_LIBROS    = None       # Límite de libros de Gutenberg
 MAX_OSCAR_FRAGMENTOS    = 25_000  # fragmentos de texto web en español (OSCAR)
 MAX_DIALOGOS_FRAGMENTOS  = 120_000  # fragmentos de diálogos/conversaciones (HF)
@@ -569,15 +569,12 @@ def procesar_oscar_spanish():
     docs_procesados = docs_saltados = 0
 
     try:
-        # Usamos una versión anterior o un dataset similar que no sea gated si es posible
-        # o simplemente manejamos el error de autenticación con un mensaje claro.
-        logger.info("  Cargando OSCAR (es)...")
+        # Usamos un dataset público y accesible sin gating (Spanish Billion Words es genial)
+        logger.info("  Cargando Spanish Billion Words (Muestra)...")
         dataset = load_dataset(
-            "oscar-corpus/OSCAR-2201", # Intentamos la versión 2201 que a veces es más accesible
-            "es",                
+            "pablousieto/spanish_billion_words", 
             split="train",
-            streaming=True,
-            trust_remote_code=True
+            streaming=True
         )
 
         for doc in dataset:
@@ -665,9 +662,9 @@ def procesar_dialogos_naturales():
     total_frag = 0
     buffer: list[str] = []
     
-    # Diálogos OpenSubtitles: Usamos el par 'en-es' y tomamos la columna 'es'
+    # Diálogos: Usamos opus-100 que es público y no-gated
     datasets_config = [
-        {"path": "opus_subtitles", "name": "en-es", "split": "train"},
+        {"path": "Helsinki-NLP/opus-100", "name": "en-es", "split": "train"},
     ]
 
     for conf in datasets_config:
@@ -680,8 +677,7 @@ def procesar_dialogos_naturales():
                 conf['path'], 
                 conf['name'], 
                 split=conf['split'], 
-                streaming=True,
-                trust_remote_code=True
+                streaming=True
             )
 
             for doc in dataset:

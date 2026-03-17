@@ -2144,16 +2144,29 @@ REPOS_GITHUB = [
         "torch/jit/_recursive.py",
         "torch/distributed/distributed_c10d.py",
     ]),
-    ("karpathy", "minGPT", "master", [
-        "mingpt/model.py",
-        "mingpt/trainer.py",
-        "mingpt/bpe.py",
-        "demo.ipynb",
-    ]),
     ("karpathy", "nanoGPT", "master", [
         "model.py",
         "train.py",
         "data/shakespeare_char/prepare.py",
+        "config/train_gpt2.py",
+        "config/train_shakespeare_char.py",
+    ]),
+    ("karpathy", "llm.c", "master", [
+        "train_gpt2.c",
+        "train_gpt2.cu",
+        "llm.h",
+        "dev/data/tinyshakespeare.py",
+    ]),
+    ("karpathy", "llama2.c", "master", [
+        "model.c",
+        "run.c",
+        "export.py",
+    ]),
+    ("karpathy", "minGPT", "master", [
+        "mingpt/model.py",
+        "mingpt/trainer.py",
+        "mingpt/utils.py",
+        "mingpt/bpe.py",
     ]),
     ("ray-project", "ray", "master", [
         "python/ray/worker.py",
@@ -2576,6 +2589,240 @@ REPOS_GITHUB = [
     ]),
     ("ratatui-org", "ratatui", "main", [
         "src/terminal.rs",
+        "src/widgets/paragraph.rs",
+        "src/layout.rs",
+        "src/buffer.rs",
+    ]),
+    # ── Batch 3 — IA & Agents ────────────────────────────────────────────────
+    ("FlowiseAI", "Flowise", "main", [
+        "packages/server/src/index.ts",
+        "packages/components/nodes/LLMs/OpenAI/OpenAI.ts",
+        "packages/components/nodes/Chains/LLMChain/LLMChain.ts",
+    ]),
+    ("ai16z", "eliza", "main", [
+        "src/core/agent.ts",
+        "src/core/context.ts",
+        "src/services/social.ts",
+    ]),
+    ("volcengine", "verl", "main", [
+        "verl/trainer/ppo.py",
+        "verl/models/llama.py",
+    ]),
+    ("OpenGVLab", "LightRAG", "main", [
+        "lightrag/core/model.py",
+        "lightrag/core/retriever.py",
+    ]),
+    ("anthropics", "anthropic-sdk-python", "main", [
+        "src/anthropic/resources/messages.py",
+        "src/anthropic/_client.py",
+    ]),
+    ("openai", "openai-python", "main", [
+        "src/openai/resources/chat/completions.py",
+        "src/openai/_client.py",
+    ]),
+    ("google", "flax", "main", [
+        "flax/linen/linear.py",
+        "flax/training/train_state.py",
+    ]),
+    ("keras-team", "keras", "master", [
+        "keras/layers/core/dense.py",
+        "keras/models/model.py",
+        "keras/optimizers/adam.py",
+    ]),
+    ("facebookresearch", "llama", "main", [
+        "llama/model.py",
+        "llama/tokenizer.py",
+        "llama/generation.py",
+    ]),
+    # ── Batch 4 — Web & Frameworks ───────────────────────────────────────────
+    ("honojs", "hono", "main", [
+        "src/hono.ts",
+        "src/router.ts",
+        "src/context.ts",
+        "src/middleware/logger/index.ts",
+    ]),
+    ("redwoodjs", "redwood", "main", [
+        "packages/api/src/functions/graphql.ts",
+        "packages/router/src/router.tsx",
+    ]),
+    ("TanStack", "router", "main", [
+        "packages/react-router/src/router.ts",
+        "packages/react-router/src/route.ts",
+    ]),
+    ("TanStack", "form", "main", [
+        "packages/react-form/src/useForm.tsx",
+    ]),
+    ("tldraw", "tldraw", "main", [
+        "packages/tldraw/src/lib/Tldraw.tsx",
+        "packages/editor/src/lib/editor/Editor.ts",
+    ]),
+    ("facebook", "lexical", "main", [
+        "packages/lexical/src/LexicalEditor.ts",
+        "packages/lexical-react/src/LexicalComposer.tsx",
+    ]),
+    ("shadcn", "taxonomy", "main", [
+        "app/(marketing)/layout.tsx",
+        "config/site.ts",
+    ]),
+    # ── Batch 5 — Tools & Systems ────────────────────────────────────────────
+    ("rustdesk", "rustdesk", "master", [
+        "src/main.rs",
+        "src/server.rs",
+        "src/client.rs",
+    ]),
+    ("awesome-selfhosted", "awesome-selfhosted", "master", [
+        "README.md",
+    ]),
+    ("n8n-io", "n8n", "master", [
+        "packages/cli/src/Server.ts",
+        "packages/nodes-base/nodes/HttpRequest/HttpRequest.node.ts",
+    ]),
+    ("AUTOMATIC1111", "stable-diffusion-webui", "master", [
+        "modules/ui.py",
+        "modules/processing.py",
+        "launch.py",
+    ]),
+    ("nodejs", "node", "main", [
+        "lib/internal/fs/utils.js",
+        "src/node.cc",
+        "deps/v8/src/api/api.cc",
+    ]),
+    ("denoland", "deno", "main", [
+        "cli/main.rs",
+        "runtime/worker.rs",
+    ]),
+    ("llvm", "llvm-project", "main", [
+        "llvm/lib/IR/Core.cpp",
+        "clang/lib/AST/ASTContext.cpp",
+    ]),
+    # ── Batch 6 — Infrastructure & Cloud ──────────────────────────────────────
+    ("docker", "cli", "master", [
+        "cli/command/container/run.go",
+    ]),
+    ("docker", "compose", "main", [
+        "pkg/compose/service.go",
+    ]),
+    ("hashicorp", "consul", "main", [
+        "agent/consul/server.go",
+    ]),
+    ("hashicorp", "nomad", "main", [
+        "nomad/client.go",
+    ]),
+    ("hashicorp", "packer", "main", [
+        "packer/builder.go",
+    ]),
+    ("prometheus", "alertmanager", "main", [
+        "dispatch/dispatch.go",
+    ]),
+    ("grafana", "loki", "main", [
+        "pkg/ingester/ingester.go",
+    ]),
+    ("grafana", "tempo", "main", [
+        "pkg/tempo/tempo.go",
+    ]),
+    ("elastic", "kibana", "main", [
+        "src/core/server/server.ts",
+    ]),
+    ("elastic", "logstash", "main", [
+        "logstash-core/lib/logstash/runner.rb",
+    ]),
+    # ── Batch 7 — Databases & Storage ─────────────────────────────────────────
+    ("postgres", "postgres", "master", [
+        "src/backend/executor/execMain.c",
+        "src/backend/storage/buffer/bufmgr.c",
+    ]),
+    ("mongodb", "mongo", "master", [
+        "src/mongo/db/query/executor.cpp",
+    ]),
+    ("yugabyte", "yugabyte-db", "master", [
+        "src/yb/tablet/tablet.cc",
+    ]),
+    ("scylladb", "scylladb", "master", [
+        "main.cc",
+    ]),
+    ("qdrant", "qdrant", "master", [
+        "lib/collection/src/collection.rs",
+    ]),
+    ("chroma-core", "chroma", "main", [
+        "chromadb/api/segment.py",
+    ]),
+    ("weaviate", "weaviate", "master", [
+        "entities/models/object.go",
+    ]),
+    ("dask", "dask", "main", [
+        "dask/array/core.py",
+        "dask/dataframe/core.py",
+    ]),
+    # ── Batch 8 — Frontend & Apps ─────────────────────────────────────────────
+    ("mui", "material-ui", "master", [
+        "packages/mui-material/src/Button/Button.js",
+    ]),
+    ("ant-design", "ant-design", "master", [
+        "components/button/index.tsx",
+    ]),
+    ("element-plus", "element-plus", "dev", [
+        "packages/components/button/src/button.vue",
+    ]),
+    ("ionic-team", "ionic-framework", "main", [
+        "core/src/components/button/button.tsx",
+    ]),
+    ("flutter", "flutter", "master", [
+        "packages/flutter/lib/src/widgets/framework.dart",
+        "packages/flutter/lib/src/material/button.dart",
+        "packages/flutter/lib/src/cupertino/button.dart",
+    ]),
+    # ── Batch 9 — Data Viz & Science ──────────────────────────────────────────
+    ("numpy", "numpy", "main", [
+        "numpy/core/src/multiarray/arrayobj.c",
+        "numpy/fft/_pocketfft.py",
+    ]),
+    ("scipy", "scipy", "main", [
+        "scipy/optimize/_minimize.py",
+    ]),
+    ("matplotlib", "matplotlib", "main", [
+        "lib/matplotlib/axes/_axes.py",
+    ]),
+    ("plotly", "plotly.js", "master", [
+        "src/core.js",
+    ]),
+    ("d3", "d3", "main", [
+        "src/index.js",
+    ]),
+    ("threejs", "three.js", "dev", [
+        "src/core/Object3D.js",
+        "src/renderers/WebGLRenderer.js",
+    ]),
+    # ── Batch 10 — Blockchain ─────────────────────────────────────────────────
+    ("ethereum", "go-ethereum", "master", [
+        "eth/backend.go",
+        "core/state_processor.go",
+    ]),
+    ("solana-labs", "solana", "master", [
+        "runtime/src/bank.rs",
+    ]),
+    ("near", "nearcore", "master", [
+        "chain/chain/src/chain.rs",
+    ]),
+    ("paritytech", "polkadot-sdk", "master", [
+        "polkadot/node/service/src/lib.rs",
+    ]),
+    ("aptos-labs", "aptos-core", "main", [
+        "aptos-node/src/main.rs",
+    ]),
+    ("sui-foundation/sui", "sui", "main", [
+        "crates/sui-node/src/lib.rs",
+    ]),
+    ("cosmos", "cosmos-sdk", "main", [
+        "baseapp/baseapp.go",
+    ]),
+    # ── Batch 11 — Utils ──────────────────────────────────────────────────────
+    ("AUTOMATIC1111", "stable-diffusion-webui", "master", [
+        "modules/txt2img.py",
+        "modules/img2img.py",
+    ]),
+    ("opencv", "opencv", "4.x", [
+        "modules/imgproc/src/color.cpp",
+        "modules/core/src/matrix.cpp",
     ]),
     # ── Más Repos Populares (Batch 3) ─────────────────────────────────────────
     ("freeCodeCamp", "freeCodeCamp", "main", [
