@@ -23,17 +23,17 @@ CONFIG = {
     "d_ff"       : 4096,
     "max_len"    : 512,
     "dropout"    : 0.1,
-    "batch_size_per_gpu" : 4,
-    "accumulation_steps" : 8,
-    "epochs"             : 3,
-    "lr"                 : 1.5e-4,
+    "batch_size_per_gpu" : 6,
+    "accumulation_steps" : 6,
+    "epochs"             : 6,
+    "lr"                 : 2e-4,
     "grad_clip"          : 1.0,
-    "warmup_steps"       : 2000,
+    "warmup_steps"       : 3000,
 
     # Rutas
-    "dataset_path"  : "data/dataset.jsonl",
-    "tokenizer_path": "models/tokenizer.json",
-    "checkpoint_dir": "models/checkpoints",
+ "dataset_path"  : "/kaggle/input/my-llm-kaggle/data/dataset.jsonl" if KAGGLE else "data/dataset.jsonl",
+    "tokenizer_path": "/kaggle/input/my-llm-kaggle/models/tokenizer.json" if KAGGLE else "models/tokenizer.json",
+    "checkpoint_dir": "/kaggle/working/checkpoints" if KAGGLE else "models/checkpoints",
 }
 
 # DATASET
@@ -104,7 +104,7 @@ class TextDataset(Dataset):
 # ENTRENAMIENTO Y EVALUACION (DDP)
 
 def entrenar_epoca(rank, model, loader, optimizer, scheduler, scaler, config,
-                   epoca, total_epocas, pad_id, world_size):
+                   epoca, total_epocas, pad_id, world_size, mejor_val_loss=float('inf')):
     model.train()
 
     perdida_total     = 0.0
@@ -142,6 +142,21 @@ def entrenar_epoca(rank, model, loader, optimizer, scheduler, scaler, config,
             scheduler.step()
             optimizer.zero_grad()
 
+        # Guardar checkpoint intermedio cada 1000 pasos (solo rank=0)
+        if rank == 0 and (batch_idx + 1) % 1000 == 0:
+            torch.save({
+                "epoca"       : epoca,
+                "batch_idx"   : batch_idx,
+                "config"      : config,
+                "val_loss"    : float('inf'),  # no tenemos val_loss todavía
+                "mejor_val_loss": mejor_val_loss,
+                "model_state" : model.module.state_dict(),
+                "optimizer"   : optimizer.state_dict(),
+                "scheduler"   : scheduler.state_dict(),
+                "scaler"      : scaler.state_dict(),
+            }, os.path.join(config["checkpoint_dir"], "last_model.pt"))
+            print(f"  [Backup] Checkpoint intermedio guardado en paso {batch_idx + 1}")
+
         perdida_total     += loss.item()
         batches_vistos    += 1
         # Multiplicamos por world_size para estimar toc/s globales reales
@@ -157,8 +172,8 @@ def entrenar_epoca(rank, model, loader, optimizer, scheduler, scaler, config,
             vram_info = ""
             for i in range(world_size):
                 vram_used  = torch.cuda.max_memory_allocated(i) / 1e9
-                vram_total = torch.cuda.get_device_properties(i).total_memory / 1e9
-                vram_info += f" | GPU{i}: {vram_used:.1f}GB"
+                vram_total = torch.cuda.get_device_properties(rank).total_memory / 1e9
+                vram_info  = f" | GPU{rank}: {vram_used:.1f}/{vram_total:.1f}GB"
 
             print(
                 f"  Época {epoca}/{total_epocas} | "
@@ -186,10 +201,11 @@ def evaluar(rank, model, loader, config, pad_id, world_size):
 
             with torch.amp.autocast(device_type="cuda", enabled=True):
                 logits = model(inputs)
-                loss   = nn.functional.cross_entropy(
+                loss = nn.functional.cross_entropy(
                     logits.view(-1, config["vocab_size"]),
                     targets.view(-1),
                     ignore_index=pad_id,
+                    label_smoothing=0.15,
                 )
             perdida_total += loss.item()
             batches       += 1
@@ -330,7 +346,7 @@ def main_worker(rank, world_size):
 
         train_loss = entrenar_epoca(
             rank, model, train_loader, optimizer, scheduler, scaler,
-            CONFIG, epoca, CONFIG["epochs"], pad_id, world_size
+            CONFIG, epoca, CONFIG["epochs"], pad_id, world_size, mejor_val_loss
         )
         val_loss = evaluar(rank, model, val_loader, CONFIG, pad_id, world_size)
         
