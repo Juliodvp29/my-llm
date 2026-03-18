@@ -54,6 +54,7 @@ MAX_WIKIPEDIA_ARTICULOS = None
 MAX_GUTENBERG_LIBROS    = None
 MAX_OSCAR_FRAGMENTOS    = 130_000
 MAX_DIALOGOS_FRAGMENTOS  = 300_000
+MAX_OPENSUBTITLES_FRAGMENTOS = 100_000
 MAX_GITHUB_FRAGMENTOS   = 200_000
 MAX_FRAGMENT_CHARS      = 2_000    # longitud máxima de cada fragmento (chars)
 
@@ -842,6 +843,81 @@ def procesar_github_api():
 
 
 
+def procesar_opensubtitles():
+    """
+    Descarga fragmentos de OpenSubtitles (vía OPUS-100 en-es) desde Hugging Face.
+    Ideal para lenguaje conversacional y natural.
+    """
+    NOMBRE_CACHE = "opensubtitles_es"
+    
+    # Comprobar cache existente para permitir reanudación
+    initial_count = 0
+    if cache_existe(NOMBRE_CACHE):
+        ruta = os.path.join(CACHE_DIR, f"{NOMBRE_CACHE}.jsonl")
+        initial_count = sum(1 for _ in open(ruta, encoding='utf-8'))
+        if initial_count >= MAX_OPENSUBTITLES_FRAGMENTOS:
+            logger.info(f"OpenSubtitles: cache completa ({initial_count:,} fragmentos). Saltando.")
+            return initial_count
+        else:
+            logger.info(f"OpenSubtitles: cache parcial ({initial_count:,}/{MAX_OPENSUBTITLES_FRAGMENTOS:,}). Continuando...")
+
+    logger.info(f"Iniciando descarga de OpenSubtitles ES (streaming)...")
+
+    try:
+        from datasets import load_dataset
+    except ImportError:
+        logger.error("La librería 'datasets' es necesaria.")
+        return 0
+
+    total_frag = initial_count
+    encountered_frag = 0
+    buffer = []
+
+    try:
+        # Cargamos el dataset OPUS 100 y tomamos la parte es
+        dataset = load_dataset(
+            "Helsinki-NLP/opus-100", 
+            "en-es", 
+            split="train", 
+            streaming=True
+        )
+
+        for item in dataset:
+            if total_frag >= MAX_OPENSUBTITLES_FRAGMENTOS:
+                break
+                
+            trans = item.get("translation", {})
+            texto = trans.get("es", "").strip()
+
+            if len(texto) < 40: # Filtramos frases demasiado cortas o ruido
+                continue
+
+            texto_limpio = limpiar_texto_natural(texto)
+            if not texto_limpio:
+                continue
+
+            encountered_frag += 1
+            if encountered_frag <= initial_count:
+                continue
+
+            buffer.append(texto_limpio)
+            total_frag += 1
+
+            if len(buffer) >= 2000:
+                guardar_en_cache(buffer, NOMBRE_CACHE)
+                buffer = []
+                logger.info(f"  [OpenSubtitles] {total_frag:,}/{MAX_OPENSUBTITLES_FRAGMENTOS:,} fragmentos...")
+
+    except Exception as e:
+        logger.error(f"Error procesando OpenSubtitles: {e}")
+    finally:
+        if buffer:
+            guardar_en_cache(buffer, NOMBRE_CACHE)
+
+    logger.info(f"OpenSubtitles finalizado: {total_frag:,} fragmentos totales.")
+    return total_frag
+
+
 # ======================================================================
 # EJECUCIÓN PRINCIPAL
 # ======================================================================
@@ -879,6 +955,10 @@ def generar_dataset_completo():
         frag_dialogos  = procesar_dialogos_naturales()
         logger.info("-" * 60)
 
+        # Fuente 4.2 — OpenSubtitles ES
+        frag_subs      = procesar_opensubtitles()
+        logger.info("-" * 60)
+
         # Fuente 5 — GitHub API
         frag_github    = procesar_github_api()
         logger.info("-" * 60)
@@ -898,6 +978,7 @@ def generar_dataset_completo():
         logger.info(f"  Repos local:  {frag_local:,} fragmentos")
         logger.info(f"  OSCAR español: {frag_oscar:,} fragmentos")
         logger.info(f"  Diálogos:     {frag_dialogos:,} fragmentos")
+        logger.info(f"  Subtítulos:   {frag_subs:,} fragmentos")
         logger.info(f"  GitHub API:   {frag_github:,} fragmentos")
         logger.info(f"  TOTAL:        {total:,} fragmentos en dataset.jsonl")
         logger.info(f"  Tiempo:       {tiempo:.1f}s ({tiempo/60:.1f} min)")
