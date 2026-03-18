@@ -4,9 +4,7 @@ import torch.nn.functional as F
 import math
 
 
-# ----------------------------------------------------------------------
 # Auto-atención de producto escalar escalado (Scaled Dot-Product Attention)
-# ----------------------------------------------------------------------
 
 def scaled_dot_product_attention(
     Q: torch.Tensor,
@@ -39,9 +37,7 @@ def scaled_dot_product_attention(
     return output, weights
 
 
-# ----------------------------------------------------------------------
 # Auto-atención Multicabeza
-# ----------------------------------------------------------------------
 
 class MultiHeadAttention(nn.Module):
     """
@@ -90,7 +86,7 @@ class MultiHeadAttention(nn.Module):
         mask: torch.Tensor = None
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """
-        En un decoder-only (GPT-style), Q, K y V vienen del mismo tensor x.
+        En un decoder-only , Q, K y V vienen del mismo tensor x.
 
         x    : (batch, seq_len, d_model)
         mask : (batch, 1, seq_len, seq_len)
@@ -115,9 +111,7 @@ class MultiHeadAttention(nn.Module):
         return output, attn_weights
 
 
-# ----------------------------------------------------------------------
 # Red Feed Forward
-# ----------------------------------------------------------------------
 
 class FeedForward(nn.Module):
     """

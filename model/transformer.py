@@ -4,11 +4,7 @@ from model.embeddings import TransformerEmbedding
 from model.attention import MultiHeadAttention, FeedForward
 
 
-# ----------------------------------------------------------------------
-# Bloque Transformer
-# Computa auto-atención multicabeza y feed-forward integrado con 
-# estabilización LayerNorm y conexiones residuales.
-# ----------------------------------------------------------------------
+#  Transformer
 
 class TransformerBlock(nn.Module):
     """
@@ -26,7 +22,7 @@ class TransformerBlock(nn.Module):
         self.attention  = MultiHeadAttention(d_model, n_heads, dropout)
         self.feed_forward = FeedForward(d_model, d_ff, dropout)
 
-        # Una LayerNorm antes de cada sub-capa (Pre-LN — más estable)
+        # Una LayerNorm antes de cada sub-capa (Pre-LN)
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
         self.dropout = nn.Dropout(dropout)
@@ -43,10 +39,7 @@ class TransformerBlock(nn.Module):
         return x
 
 
-# ----------------------------------------------------------------------
-# Modelo de Lenguaje Base
-# Arquitectura decoder-only generativa de tipo escalar causal.
-# ----------------------------------------------------------------------
+# Modelo de Lenguaje Base, Arquitectura decoder-only generativa de tipo escalar causal.
 
 class MiniGPT(nn.Module):
     """
@@ -154,9 +147,7 @@ class MiniGPT(nn.Module):
         return input_ids
 
 
-# ----------------------------------------------------------------------
 # Ejecución de Pruebas Integradas
-# ----------------------------------------------------------------------
 
 if __name__ == "__main__":
     print("Prueba de integración de MiniGPT...\n")

@@ -2,9 +2,7 @@ import torch
 from tokenizers import Tokenizer
 from model.transformer import MiniGPT
 
-# ----------------------------------------------------------------------
 # Carga de Modelo Pre-entrenado
-# ----------------------------------------------------------------------
 
 def cargar_modelo(checkpoint_path: str, tokenizer_path: str):
     tokenizer = Tokenizer.from_file(tokenizer_path)
@@ -28,7 +26,7 @@ def cargar_modelo(checkpoint_path: str, tokenizer_path: str):
         n_layers   = config["n_layers"],
         d_ff       = config["d_ff"],
         max_len    = config["max_len"],
-        dropout    = 0.0,   # sin dropout en inferencia
+        dropout    = 0.0,
     )
     model.load_state_dict(checkpoint["model_state"])
     model.eval()
@@ -70,10 +68,6 @@ def generar(model, tokenizer, prompt: str,
 
     return tokenizer.decode(nuevos_ids)
 
-
-# ----------------------------------------------------------------------
-# Pruebas de Generación
-# ----------------------------------------------------------------------
 
 if __name__ == "__main__":
     model, tokenizer = cargar_modelo(

@@ -1,8 +1,3 @@
-"""
-train.py — Entrenamiento de MiniGPT (~335M parámetros)
-Optimizado con DistributedDataParallel (DDP) para máxima eficiencia Multi-GPU.
-"""
-
 import torch
 import torch.nn as nn
 import torch.distributed as dist
@@ -18,12 +13,9 @@ import math
 
 from model.transformer import MiniGPT
 
-# ======================================================================
 # CONFIGURACIÓN
-# ======================================================================
 
 CONFIG = {
-    # ── Arquitectura (~350M parámetros, estilo GPT-2 Large) ────────────
     "vocab_size" : 32000,
     "d_model"    : 1024,
     "n_heads"    : 16,
@@ -31,31 +23,26 @@ CONFIG = {
     "d_ff"       : 4096,
     "max_len"    : 512,
     "dropout"    : 0.1,
-
-    # ── Hiperparámetros de entrenamiento ───────────────────────────────
-    # DDP divide el batch REAL en cada GPU. 4 en GPU0 y 4 en GPU1 = 8 totales
     "batch_size_per_gpu" : 4,
-    "accumulation_steps" : 8,       # 8 totales * 8 acumulación = 64 batch efectivo
+    "accumulation_steps" : 8,
     "epochs"             : 3,
     "lr"                 : 1.5e-4,
     "grad_clip"          : 1.0,
     "warmup_steps"       : 2000,
 
-    # ── Rutas ──────────────────────────────────────────────────────────
+    # Rutas
     "dataset_path"  : "data/dataset.jsonl",
     "tokenizer_path": "models/tokenizer.json",
     "checkpoint_dir": "models/checkpoints",
 }
 
-# ======================================================================
 # DATASET
-# ======================================================================
 
 def ensure_dataset_exists(path: str = "data/dataset.jsonl"):
     if os.path.exists(path):
         return
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    ejemplo = "Este es un dataset de ejemplo para inicializar. Ejecuta data/prepare.py primero."
+    ejemplo = "Este es un dataset de ejemplo para inicializar. Ejecutar data/prepare.py primero."
     with open(path, "w", encoding="utf-8") as f:
         f.write(json.dumps({"text": ejemplo}, ensure_ascii=False) + "\n")
     print(f"Archivo {path} creado temporalmente.")
@@ -114,9 +101,7 @@ class TextDataset(Dataset):
     def __getitem__(self, idx):
         return self.examples[idx]
 
-# ======================================================================
 # ENTRENAMIENTO Y EVALUACION (DDP)
-# ======================================================================
 
 def entrenar_epoca(rank, model, loader, optimizer, scheduler, scaler, config,
                    epoca, total_epocas, pad_id, world_size):
@@ -243,9 +228,7 @@ def cargar_checkpoint_si_existe(rank, model, optimizer, scheduler, scaler, dir_p
         )
     return epoca_inicio, mejor_val_loss
 
-# ======================================================================
 # WORKER PRINCIPAL DDP
-# ======================================================================
 
 def main_worker(rank, world_size):
     # Inicializar el grupo de procesos DDP
@@ -258,7 +241,7 @@ def main_worker(rank, world_size):
 
     if rank == 0:
         print("=" * 60)
-        print("MiniGPT — Entrenamiento con DistributedDataParallel 🚀")
+        print("Comenzando — Entrenamiento !!")
         print("=" * 60)
         os.makedirs(CONFIG["checkpoint_dir"], exist_ok=True)
 
@@ -281,9 +264,7 @@ def main_worker(rank, world_size):
     train_sampler = DistributedSampler(train_ds, num_replicas=world_size, rank=rank, shuffle=True)
     val_sampler   = DistributedSampler(val_ds, num_replicas=world_size, rank=rank, shuffle=False)
 
-    # Kaggle tiene un límite muy estricto en la RAM compartida (/dev/shm)
-    # y lanzar subprocesos (num_workers > 0) con datos pre-cargados a memoria crashea el sistema.
-    # num_workers=0 obliga a correrlos en el proceso principal de forma segura.
+    # num_workers=0 obliga a correrlos en el proceso principal de forma segura. (para kaggle)
     train_loader = DataLoader(
         train_ds, batch_size=CONFIG["batch_size_per_gpu"],
         sampler=train_sampler, drop_last=True, num_workers=0, pin_memory=True
@@ -303,7 +284,7 @@ def main_worker(rank, world_size):
     model = MiniGPT(**{k: CONFIG[k] for k in
                        ["vocab_size", "d_model", "n_heads", "n_layers", "d_ff", "max_len", "dropout"]})
     model = model.to(rank)
-    model = DDP(model, device_ids=[rank]) # Aquí ocurre la magia
+    model = DDP(model, device_ids=[rank])
 
     if rank == 0:
         print(f"Modelo cargado ({(sum(p.numel() for p in model.parameters())):,} parámetros)\n")
@@ -396,9 +377,7 @@ def main_worker(rank, world_size):
 
     dist.destroy_process_group()
 
-# ======================================================================
 # INICIO DE PROCESOS
-# ======================================================================
 
 if __name__ == "__main__":
     if not torch.cuda.is_available():

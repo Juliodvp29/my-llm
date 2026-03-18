@@ -19,9 +19,7 @@ if os.name == 'nt':
     except subprocess.CalledProcessError:
         pass
 
-# ----------------------------------------------------------------------
 # Logging
-# ----------------------------------------------------------------------
 def configurar_logger():
     logger = logging.getLogger("dataset-builder")
     logger.setLevel(logging.DEBUG)
@@ -43,9 +41,7 @@ def configurar_logger():
 
 logger = configurar_logger()
 
-# ----------------------------------------------------------------------
 # Configuración
-# ----------------------------------------------------------------------
 OUTPUT_FILE = "data/dataset.jsonl"
 CACHE_DIR   = "data/raw"
 os.makedirs("data",     exist_ok=True)
@@ -53,19 +49,16 @@ os.makedirs(CACHE_DIR,  exist_ok=True)
 
 from data.sources import IDS_LIBROS_GUTENBERG, ARTICULOS_WIKIPEDIA, REPOS_GITHUB
 
-# ── Límites de cada fuente ──────────────────────────────────────────────────
-# Ajusta estos valores según el espacio disponible y el tiempo que tengas.
-MAX_WIKIPEDIA_ARTICULOS = 0       # Límite de artículos (útil para pruebas rápidas)
-MAX_GUTENBERG_LIBROS    = None       # Límite de libros de Gutenberg
-MAX_OSCAR_FRAGMENTOS    = 25_000  # fragmentos de texto web en español (OSCAR)
-MAX_DIALOGOS_FRAGMENTOS  = 120_000  # fragmentos de diálogos/conversaciones (HF)
-MAX_GITHUB_FRAGMENTOS   = 80_000  # fragmentos de código de GitHub
+# Límites de cada fuente
+MAX_WIKIPEDIA_ARTICULOS = 0
+MAX_GUTENBERG_LIBROS    = None
+MAX_OSCAR_FRAGMENTOS    = 25_000
+MAX_DIALOGOS_FRAGMENTOS  = 120_000
+MAX_GITHUB_FRAGMENTOS   = 80_000
 MAX_FRAGMENT_CHARS      = 2_000    # longitud máxima de cada fragmento (chars)
 
 
-# ======================================================================
 # UTILIDADES DE LIMPIEZA
-# ======================================================================
 
 def limpiar_texto_natural(text: str) -> str:
     text = unicodedata.normalize("NFC", text)
@@ -85,9 +78,7 @@ def limpiar_codigo(text: str) -> str:
     return text.strip()
 
 
-# ======================================================================
 # FRAGMENTACIÓN
-# ======================================================================
 
 def fragmentar_por_parrafos(texto: str,
                              max_chars: int = MAX_FRAGMENT_CHARS,
@@ -157,9 +148,7 @@ def fragmentar_codigo(texto: str,
     return fragmentos
 
 
-# ======================================================================
-# CACHÉ (igual que antes)
-# ======================================================================
+# CACHÉ
 
 def guardar_en_cache(fragmentos: list[str], nombre_cache: str):
     if not fragmentos:
@@ -187,9 +176,7 @@ def consolidar_cache_en_output():
     return total
 
 
-# ======================================================================
-# FUENTE 1 — WIKIPEDIA (sin cambios respecto a tu versión original)
-# ======================================================================
+# FUENTE 1 — WIKIPEDIA
 
 def _encode_wiki_title(title: str) -> str:
     decoded = urllib.parse.unquote(title)
@@ -307,9 +294,7 @@ def procesar_wikipedia_con_hilos():
     return total_frag
 
 
-# ======================================================================
-# FUENTE 2 — GUTENBERG (sin cambios)
-# ======================================================================
+# FUENTE 2 — GUTENBERG
 
 def descargar_parsear_gutenberg(book_id: int) -> list[str] | None:
     urls = [
@@ -406,40 +391,9 @@ def procesar_gutenberg():
     return total_frag
 
 
-# ======================================================================
-# FUENTE 3 — REPOSITORIOS LOCALES (solo se usa cuando corres en tu PC)
-# En Colab esta función se salta automáticamente porque las rutas no existen.
-# ======================================================================
+# FUENTE 3 — REPOSITORIOS LOCALES (solo en local)
 
-RUTAS_REPOSITORIOS = [
-    r"C:\Users\julio\PycharmProjects\my-llm",
-    r"C:\Users\julio\Documents\Dev\typescript\fastapi",
-    r"C:\Users\julio\Documents\Dev\typescript\angular-docs-es",
-    r"C:\Users\julio\Documents\Dev\typescript\axolotl",
-    r"C:\Users\julio\Documents\Dev\typescript\bulletproof-react",
-    r"C:\Users\julio\Documents\Dev\typescript\DeepSpeed",
-    r"C:\Users\julio\Documents\Dev\typescript\md-preview-extension",
-    r"C:\Users\julio\Documents\Dev\typescript\pytorch-lightning",
-    r"C:\Users\julio\Documents\Dev\typescript\requests",
-    r"C:\Users\julio\Documents\Dev\typescript\RustPython",
-    r"C:\Users\julio\Documents\Dev\typescript\transformers",
-    r"C:\Users\julio\Documents\Dev\Angular\venti-multi-tenant",
-    r"C:\Users\julio\Documents\Dev\Angular\lily-estetic-web",
-    r"C:\Users\julio\Documents\Dev\Angular\srest-system",
-    r"C:\Users\julio\Documents\Dev\Angular\ecotrace",
-    r"C:\Users\julio\Documents\Dev\astro\my-portfolio",
-    r"C:\Users\julio\Documents\Dev\Bun\ecotrace-api",
-    r"C:\Users\julio\Documents\Dev\ionic\lingo",
-    r"C:\Users\julio\Documents\Dev\monorepo\snapbuy",
-    r"C:\Users\julio\Documents\Dev\monorepo\search-engine",
-    r"C:\Users\julio\Documents\Dev\Python\MusicPlayer",
-    r"C:\Users\julio\Documents\Dev\rust\rust-raytracer",
-    r"C:\Users\julio\Documents\Dev\typescript\sqlmodel",
-    r"C:\Users\julio\Documents\Dev\typescript\pydantic",
-    r"C:\Users\julio\Documents\Dev\typescript\prisma",
-    r"C:\Users\julio\Documents\Dev\typescript\book",
-    r"C:\Users\julio\Documents\Dev\typescript\vite",
-]
+RUTAS_REPOSITORIOS = []
 
 EXTENSIONES_VALIDAS = {
     '.py', '.js', '.ts', '.tsx', '.jsx', '.html', '.css', '.scss',
@@ -528,12 +482,7 @@ def procesar_repositorios_locales():
     return total_frag
 
 
-# ======================================================================
 # FUENTE 4 — HUGGING FACE OSCAR (texto web en español)
-# Usa streaming para NO descargar el dataset completo a disco.
-# El dataset OSCAR pesa cientos de GB, pero con streaming tomamos solo
-# lo que necesitamos y luego paramos.
-# ======================================================================
 
 def procesar_oscar_spanish():
     """
@@ -569,7 +518,7 @@ def procesar_oscar_spanish():
     docs_procesados = docs_saltados = 0
 
     try:
-        # Usamos un dataset público y accesible sin gating (Spanish Billion Words es genial)
+        # Usamos un dataset público y accesible sin gating
         logger.info("  Cargando Spanish Billion Words (Muestra)...")
         dataset = load_dataset(
             "pablousieto/spanish_billion_words", 
@@ -586,7 +535,6 @@ def procesar_oscar_spanish():
                 docs_saltados += 1
                 continue
             # Descartamos documentos con demasiados caracteres no latinos
-            # (spam, caracteres raros, etc.)
             chars_latinos = sum(
                 1 for c in texto
                 if unicodedata.category(c).startswith(('L', 'N', 'Z', 'P'))
@@ -635,9 +583,7 @@ def procesar_oscar_spanish():
     return total_frag
 
 
-# ======================================================================
 # FUENTE 4.1 — DIÁLOGOS Y LENGUAJE NATURAL (Hugging Face)
-# ======================================================================
 
 def procesar_dialogos_naturales():
     """
@@ -662,7 +608,7 @@ def procesar_dialogos_naturales():
     total_frag = 0
     buffer: list[str] = []
     
-    # Diálogos: Usamos opus-100 que es público y no-gated
+    # Diálogos: Usamos opus-100
     datasets_config = [
         {"path": "Helsinki-NLP/opus-100", "name": "en-es", "split": "train"},
     ]
@@ -681,8 +627,6 @@ def procesar_dialogos_naturales():
             )
 
             for doc in dataset:
-                # En opus_subtitles los datos vienen en un dict 'translation'
-                # Ej: {'translation': {'en': 'Hello', 'es': 'Hola'}}
                 if 'translation' in doc:
                     texto = doc['translation'].get('es', '')
                 elif 'text' in doc:
@@ -690,11 +634,10 @@ def procesar_dialogos_naturales():
                 else:
                     continue
 
-                if len(texto) < 40: # Diálogos un poco más cortos son aceptables
+                if len(texto) < 40:
                     continue
 
                 texto_limpio = limpiar_texto_natural(texto)
-                # No usamos fragmentar por párrafos aquí porque los diálogos suelen ser cortos
                 buffer.append(texto_limpio)
                 total_frag += 1
                 
@@ -716,24 +659,13 @@ def procesar_dialogos_naturales():
 
 
 
-# ======================================================================
-# FUENTE 5 — GITHUB API (código sin clonar repos)
-# Descarga archivos individuales via raw.githubusercontent.com
-# usando la lista REPOS_GITHUB de sources.py
-# ======================================================================
 
-
-# ======================================================================
 # FUENTE 5 — GITHUB API (Descargando ZIP del repositorio)
-# En lugar de fallar archivo por archivo, bajamos el zip completo de la
-# rama y seleccionamos archivos al azar.
-# ======================================================================
 
 def procesar_github_api():
     """
     Descarga repos públicos de GitHub como ZIP desde github.com/.../archive/...
     Extrae al azar hasta 50 archivos válidos por repositorio.
-    Esto permite recolectar muchísimos fragmentos ignorando las rutas exactas.
     """
     NOMBRE_CACHE = "codigo_github"
 
@@ -821,7 +753,7 @@ def procesar_github_api():
                         if not any(ign in fname for ign in ignorar):
                             archivos_validos.append(file_info)
 
-                # Tomamos algunos archivos al azar para que haya diversidad
+                # Tomamos algunos archivos al azar
                 random.shuffle(archivos_validos)
                 archivos_a_procesar = archivos_validos[:50]
 
@@ -868,7 +800,7 @@ def procesar_github_api():
         # Pausa amable
         time.sleep(2.0)
 
-    # Si terminamos o nos interrumpen, guardar buffer
+    # Si terminamos o se interrumpen, guardar buffer
     guardar_en_cache(buffer, NOMBRE_CACHE)
     with open(cache_repos_path, 'w', encoding='utf-8') as f:
         json.dump(list(repos_descargados), f, ensure_ascii=False)
@@ -918,7 +850,7 @@ def generar_dataset_completo():
         frag_dialogos  = procesar_dialogos_naturales()
         logger.info("-" * 60)
 
-        # Fuente 5 — GitHub API (código sin clonar)
+        # Fuente 5 — GitHub API
         frag_github    = procesar_github_api()
         logger.info("-" * 60)
 

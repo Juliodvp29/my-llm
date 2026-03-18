@@ -1,55 +1,24 @@
-# IDs de libros en español de Project Gutenberg (Actualizado y Limpio)
+# IDs de libros en español de Project Gutenberg
 IDS_LIBROS_GUTENBERG = [
-    100, 101, 103, 107, 108, 111, 123, 124, 131, 132, 134, 135, 152, 160, 291, 292, 
-    352, 422, 425, 429, 445, 541, 723, 895, 1179, 1231, 1534, 1766, 1839, 2000, 
-    2045, 2240, 3748, 3824, 4157, 4283, 7818, 11626, 11922, 11961, 12854, 13507, 
-    13545, 13575, 13734, 13735, 13876, 14438, 14507, 14514, 14740, 14765, 14856, 
-    15006, 15124, 15151, 15360, 15462, 15501, 15530, 15541, 15555, 15822, 15923, 
-    15935, 16127, 16194, 16195, 16214, 16503, 16867, 16964, 17077, 17150, 17223, 
-    17316, 17478, 17513, 17540, 17772, 19602, 20000, 20001, 20385, 21503, 28542, 
-    29078, 30175, 31430, 32420, 33481, 34241, 35201, 36796, 43091, 50027, 60510, 
-    60884, 60927, 67529, 69873, 69948, 74704, 77072, 15330,  15503,  15508,  15774, 
-    16317,  16462,  17088,  17105,  18018,   18134,  19124,  19230,  22080,  22227, 
-    22557,  24097,  25880,  27038,  27312,  31110,  32630,  39144,  40049,   40801,  
-    42802,  
-    48777,  
-    51227,  
-    53874,  
-    60501,  
-    62551,
-    11545,  
-    13165,  
-    13241,  
-    13642,  
-    13643,  
-    14152,  
-    14170,  
-    15507,  
-    16625,  
-    16726,  
-    17336,  
-    18220,  
-    18841,  
-    19125,  
-    19200,  
-    20355,  
-    21501,  
-    22045,  
-    22325,  
-    22558,  
-    24022,  
-    25881,  
-    27313,  
-    31215,  
-    35304,  
-    38446,  
-    41235,  
-    42805,  
-    45124,  
-    66802   
-]
+  100, 101, 103, 107, 108, 111, 123, 124, 131, 132, 134, 135, 152, 160, 291,
+  292, 352, 422, 425, 429, 445, 541, 723, 895, 1179, 1231, 1534, 1766, 1839,
+  2000, 2045, 2240, 3748, 3824, 4157, 4283, 7818, 11626, 11922, 11961, 12854,
+  13507, 13545, 13575, 13734, 13735, 13876, 14438, 14507, 14514, 14740, 14765,
+  14856, 15006, 15124, 15151, 15360, 15462, 15501, 15530, 15541, 15555, 15822,
+  15923, 15935, 16127, 16194, 16195, 16214, 16503, 16867, 16964, 17077, 17150,
+  17223, 17316, 17478, 17513, 17540, 17772, 19602, 20000, 20001, 20385, 21503,
+  28542, 29078, 30175, 31430, 32420, 33481, 34241, 35201, 36796, 43091, 50027,
+  60510, 60884, 60927, 67529, 69873, 69948, 74704, 77072, 15330, 15503, 15508,
+  15774, 16317, 16462, 17088, 17105, 18018, 18134, 19124, 19230, 22080, 22227,
+  22557, 24097, 25880, 27038, 27312, 31110, 32630, 39144, 40049, 40801, 42802,
+  48777, 51227, 53874, 60501, 62551, 11545, 13165, 13241, 13642, 13643, 14152,
+  14170, 15507, 16625, 16726, 17336, 18220, 18841, 19125, 19200, 20355, 21501,
+  22045, 22325, 22558, 24022, 25881, 27313, 31215, 35304, 38446, 41235, 42805,
+  45124, 66802,
+];
+
 # Lista de artículos de Wikipedia para descargar.
-# Nota: Puedes limitar cuántos se procesan en data/prepare.py usando MAX_WIKIPEDIA_ARTICULOS.
+# Nota: Se Puede limitar cuántos se procesan en data/prepare.py usando MAX_WIKIPEDIA_ARTICULOS.
 
 ARTICULOS_WIKIPEDIA = [
   "Inferencia_bayesiana",
@@ -2114,11 +2083,9 @@ ARTICULOS_WIKIPEDIA = [
   "Inferencia_de_borde",
 ];
 
-
-# triplicar para mas datos
+# REPOSITORIOS DE GITHUB
 REPOS_GITHUB = [
 
-    # ── Python — Machine Learning / Data ────────────────────────────────────
     ("huggingface", "transformers", "main", [
         "src/transformers/modeling_utils.py",
         "src/transformers/trainer.py",
@@ -2274,7 +2241,6 @@ REPOS_GITHUB = [
         "pydantic/_internal/_model_construction.py",
     ]),
 
-    # ── TypeScript / JavaScript ──────────────────────────────────────────────
     ("microsoft", "TypeScript", "main", [
         "src/compiler/checker.ts",
         "src/compiler/parser.ts",
@@ -2335,8 +2301,6 @@ REPOS_GITHUB = [
     ("fastify", "fastify", "main", [
         "lib/reply.js",
     ]),
-
-    # ── Rust ─────────────────────────────────────────────────────────────────
     ("rust-lang", "rust", "master", [
         "library/std/src/collections/hash/map.rs",
         "library/std/src/io/mod.rs",
@@ -2377,7 +2341,6 @@ REPOS_GITHUB = [
         "crates/nu-cli/src/main.rs",
     ]),
 
-    # ── Go ───────────────────────────────────────────────────────────────────
     ("gin-gonic", "gin", "master", [
         "gin.go",
         "context.go",
@@ -2408,7 +2371,6 @@ REPOS_GITHUB = [
         "pkg/middleware/middleware.go",
     ]),
 
-    # ── Infraestructura / DevOps ─────────────────────────────────────────────
     ("moby", "moby", "master", [
         "daemon/daemon.go",
         "client/client.go",
@@ -2432,7 +2394,6 @@ REPOS_GITHUB = [
         "internal/terraform/context.py",
         "internal/backend/local/backend.go",
     ]),
-    # ── Bases de Datos / Almacenamiento ──────────────────────────────────────
     ("redis", "redis", "unstable", [
         "src/server.c",
         "src/object.c",
@@ -2457,7 +2418,6 @@ REPOS_GITHUB = [
         "internal/querynode/segments.go",
     ]),
 
-    # ── Herramientas de Desarrollo / VS Code ────────────────────────────────
     ("microsoft", "vscode", "main", [
         "src/vs/editor/common/model/textModel.ts",
         "src/vs/platform/extensions/common/extensions.ts",
@@ -2467,14 +2427,12 @@ REPOS_GITHUB = [
         "src/vs/workbench/browser/layout.ts",
     ]),
 
-    # ── Web Standards / Testing ──────────────────────────────────────────────
     ("cypress-io", "cypress", "develop", [
         "packages/driver/src/cypress/cy.ts",
         "packages/server/lib/project.js",
         "packages/runner/src/main.tsx",
     ]),
 
-    # ── Otros ─────────────────────────────────────────────────────────────
     ("torvalds", "linux", "master", [
         "kernel/sched/core.c",
         "kernel/fork.c",
@@ -2485,7 +2443,6 @@ REPOS_GITHUB = [
         "net/ipv4/tcp.c",
     ]),
 
-    # ── Java ─────────────────────────────────────────────────────────────────
     ("spring-projects", "spring-framework", "main", [
         "spring-webmvc/src/main/java/org/springframework/web/servlet/DispatcherServlet.java",
         "spring-core/src/main/java/org/springframework/core/env/Environment.java",
@@ -2495,14 +2452,12 @@ REPOS_GITHUB = [
         "server/src/main/java/org/elasticsearch/cluster/ClusterState.java",
     ]),
 
-    # ── C / C++ ──────────────────────────────────────────────────────────────
     ("bitcoin", "bitcoin", "master", [
         "src/validation.cpp",
         "src/net.cpp",
         "src/wallet/wallet.cpp",
     ]),
 
-    # ── Más Python ───────────────────────────────────────────────────────────
     ("django", "django", "main", [
         "django/core/handlers/base.py",
         "django/db/models/base.py",
@@ -2516,7 +2471,6 @@ REPOS_GITHUB = [
         "pandas/core/series.py",
     ]),
 
-    # ── Más TypeScript / JavaScript ──────────────────────────────────────────
     ("vuejs", "core", "main", [
         "packages/runtime-core/src/renderer.ts",
         "packages/reactivity/src/reactive.ts",
@@ -2525,12 +2479,10 @@ REPOS_GITHUB = [
         "packages/@tailwindcss-node/src/index.ts",
     ]),
 
-    # ── Más Go ───────────────────────────────────────────────────────────────
     ("golang", "go", "master", [
         "src/net/http/server.go",
         "src/fmt/print.go",
     ]),
-    # ── Nuevos Repos - Otros ────────────────────────────────────────────────
     ("flutter", "flutter", "master", [
         "packages/flutter/lib/src/widgets/framework.dart",
     ]),
@@ -2561,7 +2513,6 @@ REPOS_GITHUB = [
     ("grafana", "grafana", "main", [
         "pkg/api/api.go",
     ]),
-    # ── Más Repos Populares (Batch 2) ─────────────────────────────────────────
     ("microsoft", "DeepSpeed", "main", [
         "deepspeed/runtime/engine.py",
         "deepspeed/ops/adam/cpu_adam.py",
@@ -2639,7 +2590,6 @@ REPOS_GITHUB = [
         "src/layout.rs",
         "src/buffer.rs",
     ]),
-    # ── Batch 4 — Mas IA & Agentes ───────────────────────────────────────────
     ("FlowiseAI", "Flowise", "main", [
         "packages/server/src/index.ts",
         "packages/components/nodes/LLMs/OpenAI/OpenAI.ts",
@@ -2680,7 +2630,6 @@ REPOS_GITHUB = [
         "llama/tokenizer.py",
         "llama/generation.py",
     ]),
-    # ── Batch 4 — Web & Frameworks ───────────────────────────────────────────
     ("honojs", "hono", "main", [
         "src/hono.ts",
         "src/router.ts",
@@ -2710,7 +2659,6 @@ REPOS_GITHUB = [
         "app/(marketing)/layout.tsx",
         "config/site.ts",
     ]),
-    # ── Batch 5 — Tools & Systems ────────────────────────────────────────────
     ("rustdesk", "rustdesk", "master", [
         "src/main.rs",
         "src/server.rs",
@@ -2741,7 +2689,6 @@ REPOS_GITHUB = [
         "llvm/lib/IR/Core.cpp",
         "clang/lib/AST/ASTContext.cpp",
     ]),
-    # ── Batch 6 — Infrastructure & Cloud ──────────────────────────────────────
     ("docker", "cli", "master", [
         "cli/command/container/run.go",
     ]),
@@ -2772,7 +2719,6 @@ REPOS_GITHUB = [
     ("elastic", "logstash", "main", [
         "logstash-core/lib/logstash/runner.rb",
     ]),
-    # ── Batch 7 — Databases & Storage ─────────────────────────────────────────
     ("postgres", "postgres", "master", [
         "src/backend/executor/execMain.c",
         "src/backend/storage/buffer/bufmgr.c",
@@ -2799,7 +2745,6 @@ REPOS_GITHUB = [
         "dask/array/core.py",
         "dask/dataframe/core.py",
     ]),
-    # ── Batch 8 — Frontend & Apps ─────────────────────────────────────────────
     ("mui", "material-ui", "master", [
         "packages/mui-material/src/Button/Button.js",
     ]),
@@ -2817,7 +2762,6 @@ REPOS_GITHUB = [
         "packages/flutter/lib/src/material/button.dart",
         "packages/flutter/lib/src/cupertino/button.dart",
     ]),
-    # ── Batch 9 — Data Viz & Science ──────────────────────────────────────────
     ("numpy", "numpy", "main", [
         "numpy/core/src/multiarray/arrayobj.c",
         "numpy/fft/_pocketfft.py",
@@ -2838,7 +2782,6 @@ REPOS_GITHUB = [
         "src/core/Object3D.js",
         "src/renderers/WebGLRenderer.js",
     ]),
-    # ── Batch 10 — Blockchain ─────────────────────────────────────────────────
     ("ethereum", "go-ethereum", "master", [
         "eth/backend.go",
         "core/state_processor.go",
@@ -2861,7 +2804,6 @@ REPOS_GITHUB = [
     ("cosmos", "cosmos-sdk", "main", [
         "baseapp/baseapp.go",
     ]),
-    # ── Batch 11 — Utils ──────────────────────────────────────────────────────
     ("AUTOMATIC1111", "stable-diffusion-webui", "master", [
         "modules/txt2img.py",
         "modules/img2img.py",
@@ -2870,7 +2812,6 @@ REPOS_GITHUB = [
         "modules/imgproc/src/color.cpp",
         "modules/core/src/matrix.cpp",
     ]),
-    # ── Batch 12 — GenAI & Modern AI (2025) ───────────────────────────────────
     ("mistralai", "mistral-common", "main", [
         "src/mistral_common/tokens/tokenizers/base.py",
     ]),
@@ -2894,7 +2835,6 @@ REPOS_GITHUB = [
     ("agno-ai", "agno", "main", [
         "agno/agent/agent.py",
     ]),
-    # ── Batch 13 — Web & UI Modern (2024-2025) ────────────────────────────────
     ("shadcn-ui", "taxonomy", "main", [
         "components/main-nav.tsx",
     ]),
@@ -2907,7 +2847,6 @@ REPOS_GITHUB = [
     ("facebook", "stylex", "main", [
         "packages/stylex/src/stylex.js",
     ]),
-    # ── Batch 14 — Mobile & Cross-platform ─────────────────────────────────────
     ("expo", "expo", "main", [
         "packages/expo/src/Expo.ts",
     ]),
@@ -2917,7 +2856,6 @@ REPOS_GITHUB = [
     ("desktop", "desktop", "development", [
         "app/src/lib/git/core.ts",
     ]),
-    # ── Batch 15 — Security & Tools ───────────────────────────────────────────
     ("projectdiscovery", "nuclei", "main", [
         "pkg/protocols/http/http.go",
     ]),
@@ -2927,7 +2865,6 @@ REPOS_GITHUB = [
     ("sqlmapproject", "sqlmap", "master", [
         "sqlmap.py",
     ]),
-    # ── Más Repos Populares (Batch 3) ─────────────────────────────────────────
     ("freeCodeCamp", "freeCodeCamp", "main", [
         "curriculum/challenges/english/01-responsive-web-design/basic-html-and-html5/say-hello-to-html-elements.md",
         "api/src/server.ts",

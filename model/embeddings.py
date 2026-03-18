@@ -3,10 +3,7 @@ import torch.nn as nn
 import math
 
 
-# ----------------------------------------------------------------------
 # Embeddings de Tokens
-# Mapeo proyectivo para representar secuencias de IDs en hiperespacio.
-# ----------------------------------------------------------------------
 
 class TokenEmbedding(nn.Module):
     """
@@ -20,9 +17,6 @@ class TokenEmbedding(nn.Module):
     def __init__(self, vocab_size: int, d_model: int):
         super().__init__()
 
-        # nn.Embedding es básicamente una tabla de búsqueda:
-        # fila i = vector del token con ID i
-        # Tiene vocab_size filas y d_model columnas
         self.embedding = nn.Embedding(vocab_size, d_model)
         self.d_model = d_model
 
@@ -36,10 +30,7 @@ class TokenEmbedding(nn.Module):
         return self.embedding(x) * math.sqrt(self.d_model)
 
 
-# ----------------------------------------------------------------------
 # Codificación Posicional
-# Inyección de señal sinusoidal para preservar posición temporal estática.
-# ----------------------------------------------------------------------
 
 class PositionalEncoding(nn.Module):
     """
@@ -76,8 +67,7 @@ class PositionalEncoding(nn.Module):
         # Agregamos dimensión de batch: (1, max_len, d_model)
         pe = pe.unsqueeze(0)
 
-        # register_buffer: guarda pe como parte del modelo pero
-        # NO como parámetro entrenable (no cambia con el gradiente)
+        # register_buffer: guarda pe como parte del modelo per nO como parámetro entrenable
         self.register_buffer('pe', pe)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -89,10 +79,7 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
-# ----------------------------------------------------------------------
 # Módulo Híbrido de Embeddings
-# Interfaz completa integrando embeddings de tokens y posicionales.
-# ----------------------------------------------------------------------
 
 class TransformerEmbedding(nn.Module):
     """
@@ -114,9 +101,7 @@ class TransformerEmbedding(nn.Module):
         return self.pos_enc(self.token_emb(x))
 
 
-# ----------------------------------------------------------------------
 # Ejecución de prueba
-# ----------------------------------------------------------------------
 
 if __name__ == "__main__":
     print("Prueba del módulo embeddings...\n")

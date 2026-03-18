@@ -1,5 +1,3 @@
-"""Verifica que las dependencias principales se importen y que PyTorch funcione."""
-
 import torch
 import tokenizers
 import datasets

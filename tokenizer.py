@@ -7,19 +7,16 @@ from tokenizers.decoders import ByteLevel as ByteLevelDecoder
 import os
 import json
 
-# ----------------------------------------------------------------------
 # 0. Verificación del dataset
-# ----------------------------------------------------------------------
 
 def ensure_dataset_exists(path: str = "data/dataset.jsonl"):
-    """Crea un registro mínimo si el dataset no existe, para evitar fallos en frío."""
     if os.path.exists(path):
         return
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
     ejemplo = (
         "Este es un dataset de ejemplo para inicializar el proceso. "
-        "Ejecuta data/prepare.py para generar un dataset completo. "
+        "Ejecutar data/prepare.py para generar un dataset completo. "
         "Este texto se repite para asegurar que haya suficientes tokens."
     )
     with open(path, "w", encoding="utf-8") as f:
@@ -28,9 +25,7 @@ def ensure_dataset_exists(path: str = "data/dataset.jsonl"):
     print(f"Archivo {path} inicializado. Ejecuta 'python data/prepare.py' primero.")
 
 
-# ----------------------------------------------------------------------
 # 1. Escritura del corpus de entrenamiento — sin cargar todo en RAM
-# ----------------------------------------------------------------------
 
 def escribir_corpus(dataset_path: str, corpus_path: str) -> int:
     """
@@ -51,9 +46,7 @@ def escribir_corpus(dataset_path: str, corpus_path: str) -> int:
     return total
 
 
-# ----------------------------------------------------------------------
 # 2. Construcción y entrenamiento del tokenizer
-# ----------------------------------------------------------------------
 
 # Rutas
 DATASET_PATH = "data/dataset.jsonl"
@@ -95,19 +88,14 @@ tokenizer.train(files=[CORPUS_PATH], trainer=trainer)
 vocab_size_real = tokenizer.get_vocab_size()
 print(f"Tokenizer entrenado | Vocabulario final: {vocab_size_real:,} tokens")
 
-# Nota: el vocabulario real puede ser menor que vocab_size=32000 si el corpus
-# no tiene suficientes pares con min_frequency >= 10. Es normal.
+# Nota: el vocabulario real puede ser menor que vocab_size=32000 si el corpus no tiene suficientes pares con min_frequency >= 10
 
-# ----------------------------------------------------------------------
 # 3. Guardado
-# ----------------------------------------------------------------------
 
 tokenizer.save(OUTPUT_PATH)
 print(f"Tokenizer exportado a {OUTPUT_PATH}")
 
-# ----------------------------------------------------------------------
 # 4. Verificación
-# ----------------------------------------------------------------------
 
 print("\n" + "-" * 50)
 print("Verificación de segmentación")
