@@ -1,12 +1,15 @@
 """
 train.py — Entrenamiento de MiniGPT (~335M parámetros)
-Optimizado para 2x GPU T4 (Kaggle) con DataParallel, Mixed Precision y Gradient Accumulation.
-También funciona en 1 GPU o CPU de forma automática.
+Optimizado con DistributedDataParallel (DDP) para máxima eficiencia Multi-GPU.
 """
 
 import torch
 import torch.nn as nn
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.distributed import DistributedSampler
 from tokenizers import Tokenizer
 import json
 import time
@@ -14,33 +17,6 @@ import os
 import math
 
 from model.transformer import MiniGPT
-
-
-# ======================================================================
-# DETECCIÓN DE DISPOSITIVO
-# ======================================================================
-
-DEVICE = (
-    "cuda"  if torch.cuda.is_available()  else
-    "mps"   if torch.backends.mps.is_available() else
-    "cpu"
-)
-
-USE_AMP = (DEVICE == "cuda")
-
-print(f"Dispositivo: {DEVICE.upper()}")
-if USE_AMP:
-    print("Mixed Precision (FP16): ACTIVADO  → ~2x más rápido, mitad de VRAM")
-else:
-    print("Mixed Precision (FP16): desactivado (solo disponible en GPU CUDA)")
-
-# Detectar número de GPUs disponibles
-NUM_GPUS = torch.cuda.device_count() if DEVICE == "cuda" else 0
-if NUM_GPUS > 1:
-    print(f"GPUs detectadas: {NUM_GPUS} → Se usará DataParallel ⚡")
-elif NUM_GPUS == 1:
-    print(f"GPUs detectadas: 1")
-
 
 # ======================================================================
 # CONFIGURACIÓN
@@ -57,10 +33,9 @@ CONFIG = {
     "dropout"    : 0.1,
 
     # ── Hiperparámetros de entrenamiento ───────────────────────────────
-    # batch_size=8 con 2 GPUs: cada GPU procesa 4 ejemplos (igual que antes)
-    # accumulation_steps=8: 8 × 8 = 64 batch efectivo (igual que antes)
-    "batch_size"         : 8,       # ← CAMBIADO: 4→8 para aprovechar 2 GPUs
-    "accumulation_steps" : 8,       # ← CAMBIADO: 16→8, batch efectivo sigue siendo 64
+    # DDP divide el batch REAL en cada GPU. 4 en GPU0 y 4 en GPU1 = 8 totales
+    "batch_size_per_gpu" : 4,
+    "accumulation_steps" : 8,       # 8 totales * 8 acumulación = 64 batch efectivo
     "epochs"             : 3,
     "lr"                 : 1.5e-4,
     "grad_clip"          : 1.0,
@@ -72,7 +47,6 @@ CONFIG = {
     "checkpoint_dir": "models/checkpoints",
 }
 
-
 # ======================================================================
 # DATASET
 # ======================================================================
@@ -81,29 +55,30 @@ def ensure_dataset_exists(path: str = "data/dataset.jsonl"):
     if os.path.exists(path):
         return
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    ejemplo = (
-        "Este es un dataset de ejemplo para inicializar el proceso. "
-        "Ejecuta data/prepare.py para generar un dataset completo."
-    )
+    ejemplo = "Este es un dataset de ejemplo para inicializar. Ejecuta data/prepare.py primero."
     with open(path, "w", encoding="utf-8") as f:
         f.write(json.dumps({"text": ejemplo}, ensure_ascii=False) + "\n")
-    print(f"Archivo {path} creado con ejemplo. Ejecuta 'python data/prepare.py' primero.")
-
+    print(f"Archivo {path} creado temporalmente.")
 
 class TextDataset(Dataset):
-    def __init__(self, path: str, tokenizer: Tokenizer, max_len: int):
-        ensure_dataset_exists(path)
+    def __init__(self, path: str, tokenizer: Tokenizer, max_len: int, is_main_process=True):
+        if is_main_process:
+            ensure_dataset_exists(path)
 
         self.examples = []
         bos_id = tokenizer.token_to_id("<bos>")
         eos_id = tokenizer.token_to_id("<eos>")
         pad_id = tokenizer.token_to_id("<pad>")
 
-        print(f"Cargando dataset desde {path}...")
+        if is_main_process:
+            print(f"Cargando dataset desde {path}...")
+            
         with open(path, encoding='utf-8') as f:
             lineas = f.readlines()
 
-        print(f"Tokenizando {len(lineas):,} fragmentos...")
+        if is_main_process:
+            print(f"Tokenizando {len(lineas):,} fragmentos...")
+            
         saltados = 0
 
         for linea in lineas:
@@ -130,7 +105,8 @@ class TextDataset(Dataset):
                 torch.tensor(ids[1:],  dtype=torch.long),
             ))
 
-        print(f"Ejemplos validos: {len(self.examples):,} | Descartados: {saltados:,}")
+        if is_main_process:
+            print(f"Ejemplos validos: {len(self.examples):,} | Descartados: {saltados:,}")
 
     def __len__(self):
         return len(self.examples)
@@ -138,13 +114,12 @@ class TextDataset(Dataset):
     def __getitem__(self, idx):
         return self.examples[idx]
 
-
 # ======================================================================
-# ENTRENAMIENTO POR ÉPOCA
+# ENTRENAMIENTO Y EVALUACION (DDP)
 # ======================================================================
 
-def entrenar_epoca(model, loader, optimizer, scheduler, scaler, config,
-                   epoca, total_epocas, pad_id):
+def entrenar_epoca(rank, model, loader, optimizer, scheduler, scaler, config,
+                   epoca, total_epocas, pad_id, world_size):
     model.train()
 
     perdida_total     = 0.0
@@ -156,10 +131,10 @@ def entrenar_epoca(model, loader, optimizer, scheduler, scaler, config,
     optimizer.zero_grad()
 
     for batch_idx, (inputs, targets) in enumerate(loader):
-        inputs  = inputs.to(DEVICE)
-        targets = targets.to(DEVICE)
+        inputs  = inputs.to(rank, non_blocking=True)
+        targets = targets.to(rank, non_blocking=True)
 
-        with torch.amp.autocast(device_type=DEVICE, enabled=USE_AMP):
+        with torch.amp.autocast(device_type="cuda", enabled=True):
             logits = model(inputs)
             loss   = nn.functional.cross_entropy(
                 logits.view(-1, config["vocab_size"]),
@@ -169,45 +144,36 @@ def entrenar_epoca(model, loader, optimizer, scheduler, scaler, config,
             )
             loss_scaled = loss / accumulation_steps
 
-        if USE_AMP:
-            scaler.scale(loss_scaled).backward()
-        else:
-            loss_scaled.backward()
+        scaler.scale(loss_scaled).backward()
 
         if (batch_idx + 1) % accumulation_steps == 0:
-            if USE_AMP:
-                scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(
-                    model.parameters(), config["grad_clip"]
-                )
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                torch.nn.utils.clip_grad_norm_(
-                    model.parameters(), config["grad_clip"]
-                )
-                optimizer.step()
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(), config["grad_clip"]
+            )
+            scaler.step(optimizer)
+            scaler.update()
 
             scheduler.step()
             optimizer.zero_grad()
 
         perdida_total     += loss.item()
         batches_vistos    += 1
-        tokens_procesados += inputs.numel()
+        # Multiplicamos por world_size para estimar toc/s globales reales
+        tokens_procesados += inputs.numel() * world_size 
 
-        if (batch_idx + 1) % 100 == 0:
+        if rank == 0 and (batch_idx + 1) % 100 == 0:
             perdida_promedio = perdida_total / batches_vistos
             perplexity       = math.exp(min(perdida_promedio, 20))
             elapsed          = time.time() - t_inicio
             tok_per_sec      = tokens_procesados / elapsed
 
-            # Mostrar VRAM de todas las GPUs
+            # Memoria real (DDP mantiene balance 50/50 exacto)
             vram_info = ""
-            if DEVICE == "cuda":
-                for i in range(NUM_GPUS):
-                    vram_used  = torch.cuda.memory_allocated(i) / 1e9
-                    vram_total = torch.cuda.get_device_properties(i).total_memory / 1e9
-                    vram_info += f" | GPU{i} VRAM: {vram_used:.1f}/{vram_total:.1f}GB"
+            for i in range(world_size):
+                vram_used  = torch.cuda.max_memory_allocated(i) / 1e9
+                vram_total = torch.cuda.get_device_properties(i).total_memory / 1e9
+                vram_info += f" | GPU{i}: {vram_used:.1f}GB"
 
             print(
                 f"  Época {epoca}/{total_epocas} | "
@@ -218,24 +184,22 @@ def entrenar_epoca(model, loader, optimizer, scheduler, scaler, config,
                 f"{vram_info}"
             )
 
-    return perdida_total / batches_vistos
+    # Promediar el loss entre todas las GPUs de forma estricta
+    loss_tensor = torch.tensor(perdida_total / max(1, batches_vistos)).to(rank)
+    dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
+    return loss_tensor.item() / world_size
 
-
-# ======================================================================
-# EVALUACIÓN
-# ======================================================================
-
-def evaluar(model, loader, config, pad_id):
+def evaluar(rank, model, loader, config, pad_id, world_size):
     model.eval()
     perdida_total = 0.0
     batches       = 0
 
     with torch.no_grad():
         for inputs, targets in loader:
-            inputs  = inputs.to(DEVICE)
-            targets = targets.to(DEVICE)
+            inputs  = inputs.to(rank, non_blocking=True)
+            targets = targets.to(rank, non_blocking=True)
 
-            with torch.amp.autocast(device_type=DEVICE, enabled=USE_AMP):
+            with torch.amp.autocast(device_type="cuda", enabled=True):
                 logits = model(inputs)
                 loss   = nn.functional.cross_entropy(
                     logits.view(-1, config["vocab_size"]),
@@ -245,259 +209,207 @@ def evaluar(model, loader, config, pad_id):
             perdida_total += loss.item()
             batches       += 1
 
-    return perdida_total / batches
+    loss_tensor = torch.tensor(perdida_total / max(1, batches)).to(rank)
+    dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
+    return loss_tensor.item() / world_size
 
-
-# ======================================================================
-# CHECKPOINT
-# ======================================================================
-
-def cargar_checkpoint_si_existe(model, optimizer, scheduler, scaler,
-                                 checkpoint_dir):
-    ruta = os.path.join(checkpoint_dir, "last_model.pt")
+def cargar_checkpoint_si_existe(rank, model, optimizer, scheduler, scaler, dir_path):
+    ruta = os.path.join(dir_path, "last_model.pt")
     if not os.path.exists(ruta):
-        print("No se encontró checkpoint previo. Iniciando desde cero.\n")
+        if rank == 0: print("No se encontró checkpoint. Iniciando desde cero.\n")
         return 1, float('inf')
 
-    print(f"Checkpoint encontrado en {ruta}. Reanudando...")
-    ck = torch.load(ruta, map_location="cpu")
+    if rank == 0: print(f"Checkpoint encontrado en {ruta}. Reanudando...")
+    
+    # Cargamos pasándolo directo al rank asignado de esta GPU
+    ck = torch.load(ruta, map_location=f"cuda:{rank}")
 
-    # ← CAMBIO: compatibilidad con DataParallel (.module)
-    state = ck["model_state"]
-    if isinstance(model, nn.DataParallel):
-        model.module.load_state_dict(state)
-    else:
-        model.load_state_dict(state)
-
-    model.to(DEVICE)
-
+    # En DDP, usamos model.module obligatoriamente para inyectar los pesos reales
+    model.module.load_state_dict(ck["model_state"])
     optimizer.load_state_dict(ck["optimizer"])
     scheduler.load_state_dict(ck["scheduler"])
-
-    if USE_AMP and "scaler" in ck:
+    
+    if "scaler" in ck:
         scaler.load_state_dict(ck["scaler"])
 
     epoca_inicio   = ck["epoca"] + 1
     mejor_val_loss = ck.get("mejor_val_loss", ck["val_loss"])
 
-    print(
-        f"  Reanudando desde época {epoca_inicio} "
-        f"(val_loss anterior: {ck['val_loss']:.4f}, "
-        f"mejor: {mejor_val_loss:.4f})\n"
-    )
+    if rank == 0:
+        print(
+            f"  Reanudando desde época {epoca_inicio} "
+            f"(val_loss anterior: {ck['val_loss']:.4f}, "
+            f"mejor: {mejor_val_loss:.4f})\n"
+        )
     return epoca_inicio, mejor_val_loss
 
-
 # ======================================================================
-# MAIN
+# WORKER PRINCIPAL DDP
 # ======================================================================
 
-if __name__ == "__main__":
-    if DEVICE == "cpu":
-        torch.set_num_threads(2)
-        torch.set_num_interop_threads(2)
+def main_worker(rank, world_size):
+    # Inicializar el grupo de procesos DDP
+    os.environ['MASTER_ADDR'] = '127.0.0.1'
+    os.environ['MASTER_PORT'] = '12355'
+    backend = "nccl" if os.name != "nt" else "gloo" # Kaggle(Linux)=nccl, Windows=gloo
+    dist.init_process_group(backend, rank=rank, world_size=world_size)
+    
+    torch.cuda.set_device(rank)
 
-    print("=" * 60)
-    print("MiniGPT — Entrenamiento")
-    print("=" * 60)
-    os.makedirs(CONFIG["checkpoint_dir"], exist_ok=True)
+    if rank == 0:
+        print("=" * 60)
+        print("MiniGPT — Entrenamiento con DistributedDataParallel 🚀")
+        print("=" * 60)
+        os.makedirs(CONFIG["checkpoint_dir"], exist_ok=True)
 
-    # ── Tokenizer ──────────────────────────────────────────────────────
+    # ── Tokenizer
     tokenizer  = Tokenizer.from_file(CONFIG["tokenizer_path"])
-    vocab_size = tokenizer.get_vocab_size()
-    CONFIG["vocab_size"] = vocab_size
-    print(f"Tokenizer cargado | Vocabulario: {vocab_size:,} tokens\n")
-
+    CONFIG["vocab_size"] = tokenizer.get_vocab_size()
     pad_id = tokenizer.token_to_id("<pad>")
 
-    # ── Dataset y DataLoaders ──────────────────────────────────────────
-    dataset = TextDataset(
-        CONFIG["dataset_path"], tokenizer, CONFIG["max_len"]
-    )
+    # ── Dataset (Previene colisión avisando con is_main_process)
+    dataset = TextDataset(CONFIG["dataset_path"], tokenizer, CONFIG["max_len"], is_main_process=(rank==0))
 
     val_size   = int(len(dataset) * 0.1)
     train_size = len(dataset) - val_size
     train_ds, val_ds = torch.utils.data.random_split(
         dataset, [train_size, val_size],
-        generator=torch.Generator().manual_seed(42)
+        generator=torch.Generator().manual_seed(42) # Semilla rígida para sincronía perfecta
     )
 
-    # ← CAMBIO: más workers para alimentar 2 GPUs sin cuellos de botella
-    num_workers = 4 if DEVICE == "cuda" else 0
+    # DistributedSampler asegura que la GPU0 y la GPU1 no procesen los mismos datos idénticos
+    train_sampler = DistributedSampler(train_ds, num_replicas=world_size, rank=rank, shuffle=True)
+    val_sampler   = DistributedSampler(val_ds, num_replicas=world_size, rank=rank, shuffle=False)
 
     train_loader = DataLoader(
-        train_ds,
-        batch_size=CONFIG["batch_size"],
-        shuffle=True,
-        drop_last=True,
-        num_workers=num_workers,
-        pin_memory=(DEVICE == "cuda"),
+        train_ds, batch_size=CONFIG["batch_size_per_gpu"],
+        sampler=train_sampler, drop_last=True, num_workers=4, pin_memory=True
     )
     val_loader = DataLoader(
-        val_ds,
-        batch_size=CONFIG["batch_size"],
-        shuffle=False,
-        drop_last=True,
-        num_workers=num_workers,
-        pin_memory=(DEVICE == "cuda"),
+        val_ds, batch_size=CONFIG["batch_size_per_gpu"],
+        sampler=val_sampler, drop_last=True, num_workers=4, pin_memory=True
     )
 
-    print(f"Dataset dividido:")
-    print(f"  Entrenamiento: {len(train_ds):,} ejemplos ({len(train_loader):,} batches)")
-    print(f"  Validación:    {len(val_ds):,} ejemplos")
-    print(f"  Batch efectivo: {CONFIG['batch_size'] * CONFIG['accumulation_steps']}")
-    print()
+    if rank == 0:
+        print(f"Dataset dividido y balanceado!")
+        print(f"  Batch distribuído: {CONFIG['batch_size_per_gpu']} por cada una de las {world_size} GPUs")
+        print(f"  Batch total real procesándose de golpe: {CONFIG['batch_size_per_gpu'] * world_size}")
+        print()
 
-    # ── Modelo ─────────────────────────────────────────────────────────
+    # ── Modelo
     model = MiniGPT(**{k: CONFIG[k] for k in
-                       ["vocab_size", "d_model", "n_heads", "n_layers",
-                        "d_ff", "max_len", "dropout"]})
-    model = model.to(DEVICE)
+                       ["vocab_size", "d_model", "n_heads", "n_layers", "d_ff", "max_len", "dropout"]})
+    model = model.to(rank)
+    model = DDP(model, device_ids=[rank]) # Aquí ocurre la magia
 
-    # ← NUEVO: activar DataParallel si hay más de 1 GPU
-    if DEVICE == "cuda" and NUM_GPUS > 1:
-        print(f"Activando DataParallel en {NUM_GPUS} GPUs ⚡")
-        model = nn.DataParallel(model)
+    if rank == 0:
+        print(f"Modelo cargado ({(sum(p.numel() for p in model.parameters())):,} parámetros)\n")
 
-    total_params = sum(p.numel() for p in model.parameters())
-    print(f"Modelo inicializado | Parámetros: {total_params:,}\n")
+    # ── Optimizador
+    decay_params    = [p for n, p in model.module.named_parameters() if p.requires_grad and p.dim() >= 2]
+    no_decay_params = [p for n, p in model.module.named_parameters() if p.requires_grad and p.dim() < 2]
 
-    # ── Optimizador ────────────────────────────────────────────────────
-    # ← CAMBIO: acceder a model.module si es DataParallel
-    base_model = model.module if isinstance(model, nn.DataParallel) else model
+    optimizer = torch.optim.AdamW([
+        {"params": decay_params,    "weight_decay": 0.1},
+        {"params": no_decay_params, "weight_decay": 0.0},
+    ], lr=CONFIG["lr"], betas=(0.9, 0.95), eps=1e-8)
 
-    decay_params    = [p for n, p in base_model.named_parameters()
-                       if p.requires_grad and p.dim() >= 2]
-    no_decay_params = [p for n, p in base_model.named_parameters()
-                       if p.requires_grad and p.dim() < 2]
-
-    optimizer = torch.optim.AdamW(
-        [
-            {"params": decay_params,    "weight_decay": 0.1},
-            {"params": no_decay_params, "weight_decay": 0.0},
-        ],
-        lr=CONFIG["lr"],
-        betas=(0.9, 0.95),
-        eps=1e-8,
-    )
-
-    # ── Scheduler: Cosine con Warmup ───────────────────────────────────
+    # ── Scheduler
     total_steps  = len(train_loader) * CONFIG["epochs"]
     warmup_steps = CONFIG["warmup_steps"]
 
     def lr_lambda(step):
-        if step < warmup_steps:
-            return float(step) / max(warmup_steps, 1)
+        if step < warmup_steps: return float(step) / max(warmup_steps, 1)
         progress = (step - warmup_steps) / max(total_steps - warmup_steps, 1)
         return max(0.1, 0.5 * (1.0 + math.cos(math.pi * progress)))
 
-    from torch.optim.lr_scheduler import LambdaLR
-    scheduler = LambdaLR(optimizer, lr_lambda)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    scaler    = torch.amp.GradScaler(enabled=True)
 
-    # ── GradScaler ─────────────────────────────────────────────────────
-    scaler = torch.amp.GradScaler(enabled=USE_AMP)
-
-    # ── Reanudar desde checkpoint ──────────────────────────────────────
+    # ── Checkpoint
     epoca_inicio, mejor_val_loss = cargar_checkpoint_si_existe(
-        model, optimizer, scheduler, scaler, CONFIG["checkpoint_dir"]
+        rank, model, optimizer, scheduler, scaler, CONFIG["checkpoint_dir"]
     )
 
     if epoca_inicio > CONFIG["epochs"]:
-        print("El entrenamiento ya estaba completo según el checkpoint.")
-        exit(0)
+        if rank == 0: print("Entrenamiento completado.")
+        dist.destroy_process_group()
+        return
 
-    # ── Bucle principal ────────────────────────────────────────────────
-    print("=" * 60)
-    print(f"Iniciando entrenamiento en {DEVICE.upper()}")
-    if NUM_GPUS > 1:
-        print(f"Usando {NUM_GPUS} GPUs con DataParallel")
-    print(f"Épocas: {epoca_inicio} → {CONFIG['epochs']}")
-    print(f"Batch size: {CONFIG['batch_size']}  |  "
-          f"Acumulación: {CONFIG['accumulation_steps']}  |  "
-          f"Batch efectivo: {CONFIG['batch_size'] * CONFIG['accumulation_steps']}")
-    print(f"LR máximo: {CONFIG['lr']}  |  Warmup: {warmup_steps} steps")
-    print("=" * 60)
-
+    # ── Bucle de iteración
+    t_total = time.time()
     historial = []
-    t_total   = time.time()
 
     for epoca in range(epoca_inicio, CONFIG["epochs"] + 1):
+        train_sampler.set_epoch(epoca) # Obligatorio en DDP para revolver cada epoch
         t_ep = time.time()
 
         train_loss = entrenar_epoca(
-            model, train_loader, optimizer, scheduler, scaler,
-            CONFIG, epoca, CONFIG["epochs"], pad_id
+            rank, model, train_loader, optimizer, scheduler, scaler,
+            CONFIG, epoca, CONFIG["epochs"], pad_id, world_size
         )
-        val_loss = evaluar(model, val_loader, CONFIG, pad_id)
-        val_ppl  = math.exp(min(val_loss, 20))
-        duracion = time.time() - t_ep
+        val_loss = evaluar(rank, model, val_loader, CONFIG, pad_id, world_size)
+        
+        # Solo la GPU maestra maneja métricas visuales y guarda el .pt
+        if rank == 0:
+            val_ppl = math.exp(min(val_loss, 20))
+            duracion = time.time() - t_ep
+            
+            historial.append({
+                "epoca"      : epoca, "train_loss" : round(train_loss, 4),
+                "val_loss"   : round(val_loss, 4), "val_ppl"    : round(val_ppl, 2),
+                "duracion_s" : round(duracion, 1)
+            })
 
-        historial.append({
-            "epoca"      : epoca,
-            "train_loss" : round(train_loss, 4),
-            "val_loss"   : round(val_loss, 4),
-            "val_ppl"    : round(val_ppl, 2),
-            "duracion_s" : round(duracion, 1),
-        })
+            print(f"\n{'─' * 60}")
+            print(f"  Época {epoca} completada en {duracion/60:.1f} min")
+            print(f"  Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Val PPL: {val_ppl:.1f}")
 
-        print(f"\n{'─' * 60}")
-        print(f"  Época {epoca} completada en {duracion/60:.1f} min")
-        print(f"  Train Loss: {train_loss:.4f}  |  "
-              f"Val Loss: {val_loss:.4f}  |  "
-              f"Val Perplexity: {val_ppl:.1f}")
+            if val_loss < mejor_val_loss:
+                mejor_val_loss = val_loss
+                torch.save({
+                    "epoca": epoca, "config": CONFIG, "val_loss": val_loss,
+                    "model_state": model.module.state_dict()
+                }, os.path.join(CONFIG["checkpoint_dir"], "best_model.pt"))
+                print(f"  ★ Mejor modelo guardado")
 
-        # ── Guardar mejor modelo ───────────────────────────────────────
-        if val_loss < mejor_val_loss:
-            mejor_val_loss = val_loss
-            ruta_best = os.path.join(CONFIG["checkpoint_dir"], "best_model.pt")
-            # ← CAMBIO: guardar model.module si es DataParallel
-            state_dict = model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict()
             torch.save({
-                "epoca"      : epoca,
-                "config"     : CONFIG,
-                "model_state": state_dict,
-                "val_loss"   : val_loss,
-            }, ruta_best)
-            print(f"  ★ Mejor modelo guardado (val_loss={val_loss:.4f})")
+                "epoca": epoca, "config": CONFIG, "val_loss": val_loss, "mejor_val_loss": mejor_val_loss,
+                "model_state": model.module.state_dict(), "optimizer": optimizer.state_dict(),
+                "scheduler": scheduler.state_dict(), "scaler": scaler.state_dict()
+            }, os.path.join(CONFIG["checkpoint_dir"], "last_model.pt"))
+            print(f"  Checkpoint guardado en época {epoca}")
+            print(f"{'─' * 60}\n")
 
-        # ── Guardar último estado completo ────────────────────────────
-        ruta_last = os.path.join(CONFIG["checkpoint_dir"], "last_model.pt")
-        # ← CAMBIO: guardar model.module si es DataParallel
-        state_dict = model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict()
-        checkpoint = {
-            "epoca"         : epoca,
-            "config"        : CONFIG,
-            "model_state"   : state_dict,
-            "optimizer"     : optimizer.state_dict(),
-            "scheduler"     : scheduler.state_dict(),
-            "val_loss"      : val_loss,
-            "mejor_val_loss": mejor_val_loss,
-        }
-        if USE_AMP:
-            checkpoint["scaler"] = scaler.state_dict()
+    if rank == 0:
+        print(f"{'=' * 60}\nEntrenamiento completado en {(time.time() - t_total)/60:.1f} minutos\n{'=' * 60}")
+        h_path = "models/historial.json"
+        
+        # Mezclamos el nuevo historiaL con el anterior archivo json si existe
+        hist_prev = []
+        if os.path.exists(h_path):
+            with open(h_path, "r") as f: hist_prev = json.load(f)
+        with open(h_path, "w") as f: json.dump(hist_prev + historial, f, indent=2)
 
-        torch.save(checkpoint, ruta_last)
-        print(f"  Checkpoint guardado en época {epoca}")
-        print(f"{'─' * 60}\n")
+    dist.destroy_process_group()
 
-    # ── Finalización ──────────────────────────────────────────────────
-    tiempo_total = time.time() - t_total
-    print(f"{'=' * 60}")
-    print(f"Entrenamiento completado en {tiempo_total/60:.1f} minutos")
-    print(f"Mejor val_loss: {mejor_val_loss:.4f} "
-          f"(perplexity: {math.exp(min(mejor_val_loss, 20)):.1f})")
-    print(f"{'=' * 60}")
+# ======================================================================
+# INICIO DE PROCESOS
+# ======================================================================
 
-    # ── Historial acumulativo ─────────────────────────────────────────
-    historial_path = "models/historial.json"
-    historial_previo = []
-    if os.path.exists(historial_path):
-        try:
-            with open(historial_path, "r") as f:
-                historial_previo = json.load(f)
-        except (json.JSONDecodeError, ValueError):
-            pass
+if __name__ == "__main__":
+    if not torch.cuda.is_available():
+        print("Error: DDP requiere al menos 1 GPU con CUDA. Abortando.")
+        exit(1)
 
-    with open(historial_path, "w") as f:
-        json.dump(historial_previo + historial, f, indent=2)
-    print("Historial exportado a models/historial.json")
+    # Identificamos el número de GPUs detectadas
+    world_size = torch.cuda.device_count()
+    
+    # mp.spawn iniciará `main_worker` una vez "nprocs" veces (uno para cada GPU)
+    # y enviará por defecto el (rank, *args) al worker. Rank es el ID de GPU.
+    mp.spawn(
+        main_worker,
+        args=(world_size,),
+        nprocs=world_size,
+        join=True
+    )
