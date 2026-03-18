@@ -281,13 +281,16 @@ def main_worker(rank, world_size):
     train_sampler = DistributedSampler(train_ds, num_replicas=world_size, rank=rank, shuffle=True)
     val_sampler   = DistributedSampler(val_ds, num_replicas=world_size, rank=rank, shuffle=False)
 
+    # Kaggle tiene un límite muy estricto en la RAM compartida (/dev/shm)
+    # y lanzar subprocesos (num_workers > 0) con datos pre-cargados a memoria crashea el sistema.
+    # num_workers=0 obliga a correrlos en el proceso principal de forma segura.
     train_loader = DataLoader(
         train_ds, batch_size=CONFIG["batch_size_per_gpu"],
-        sampler=train_sampler, drop_last=True, num_workers=4, pin_memory=True
+        sampler=train_sampler, drop_last=True, num_workers=0, pin_memory=True
     )
     val_loader = DataLoader(
         val_ds, batch_size=CONFIG["batch_size_per_gpu"],
-        sampler=val_sampler, drop_last=True, num_workers=4, pin_memory=True
+        sampler=val_sampler, drop_last=True, num_workers=0, pin_memory=True
     )
 
     if rank == 0:
