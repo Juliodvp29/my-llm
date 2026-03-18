@@ -53,7 +53,7 @@ from data.sources import IDS_LIBROS_GUTENBERG, ARTICULOS_WIKIPEDIA, REPOS_GITHUB
 MAX_WIKIPEDIA_ARTICULOS = None
 MAX_GUTENBERG_LIBROS    = None
 MAX_OSCAR_FRAGMENTOS    = 130_000
-MAX_DIALOGOS_FRAGMENTOS  = 280_000
+MAX_DIALOGOS_FRAGMENTOS  = 300_000
 MAX_GITHUB_FRAGMENTOS   = 200_000
 MAX_FRAGMENT_CHARS      = 2_000    # longitud máxima de cada fragmento (chars)
 
@@ -424,17 +424,24 @@ def procesar_repositorios_locales():
         )
         return 0
 
+    initial_count = 0
     if cache_existe(NOMBRE_CACHE):
         ruta = os.path.join(CACHE_DIR, f"{NOMBRE_CACHE}.jsonl")
-        n    = sum(1 for _ in open(ruta, encoding='utf-8'))
-        logger.info(f"Codigo local: cache encontrada ({n:,} fragmentos). Saltando.")
-        return n
-
+        initial_count = sum(1 for _ in open(ruta, encoding='utf-8'))
+        
+    MAX_FRAGMENTOS_LOCAL = 10_000
+    if initial_count >= MAX_FRAGMENTOS_LOCAL:
+        logger.info(f"Codigo local: cache completa ({initial_count:,} fragmentos). Saltando.")
+        return initial_count
+    
+    if initial_count > 0:
+        logger.info(f"Codigo local: cache parcial ({initial_count:,}/{MAX_FRAGMENTOS_LOCAL:,}). Continuando...")
+    
     logger.info(f"Escaneando {len(rutas_existentes)} repositorios locales...")
-    total_frag = 0
+    total_frag = initial_count
+    encountered_frag = 0
     buffer: list[str] = []
     archivos_procesados = archivos_saltados = 0
-    MAX_FRAGMENTOS_LOCAL = 10_000
 
     for ruta_base in rutas_existentes:
         for root, dirs, files in os.walk(ruta_base):
@@ -464,8 +471,14 @@ def procesar_repositorios_locales():
                     prefijo = f"# Archivo: {file} (extension: {ext})\n\n"
                     frags   = fragmentar_codigo(prefijo + limpio)
                     if frags:
-                        buffer.extend(frags)
-                        total_frag += len(frags)
+                        for frag in frags:
+                            encountered_frag += 1
+                            if encountered_frag <= initial_count:
+                                continue
+                            
+                            buffer.append(frag)
+                            total_frag += 1
+                        
                         archivos_procesados += 1
                 except Exception:
                     archivos_saltados += 1
@@ -493,11 +506,15 @@ def procesar_oscar_spanish():
     """
     NOMBRE_CACHE = "oscar_spanish"
 
+    initial_count = 0
     if cache_existe(NOMBRE_CACHE):
         ruta = os.path.join(CACHE_DIR, f"{NOMBRE_CACHE}.jsonl")
-        n    = sum(1 for _ in open(ruta, encoding='utf-8'))
-        logger.info(f"OSCAR español: cache encontrada ({n:,} fragmentos). Saltando.")
-        return n
+        initial_count = sum(1 for _ in open(ruta, encoding='utf-8'))
+        if initial_count >= MAX_OSCAR_FRAGMENTOS:
+            logger.info(f"OSCAR español: cache completa ({initial_count:,} fragmentos). Saltando.")
+            return initial_count
+        else:
+            logger.info(f"OSCAR español: cache parcial ({initial_count:,}/{MAX_OSCAR_FRAGMENTOS:,}). Continuando...")
 
     logger.info(
         f"Iniciando descarga de OSCAR español via streaming "
@@ -513,8 +530,8 @@ def procesar_oscar_spanish():
         )
         return 0
 
-    total_frag = 0
-    buffer: list[str] = []
+    total_frag = initial_count
+    encountered_frag = 0
     docs_procesados = docs_saltados = 0
 
     try:
@@ -547,6 +564,10 @@ def procesar_oscar_spanish():
             frags = fragmentar_por_parrafos(texto_limpio)
 
             for frag in frags:
+                encountered_frag += 1
+                if encountered_frag <= initial_count:
+                    continue
+
                 if total_frag >= MAX_OSCAR_FRAGMENTOS:
                     break
                 buffer.append(frag)
@@ -592,11 +613,15 @@ def procesar_dialogos_naturales():
     """
     NOMBRE_CACHE = "dialogos_naturales"
 
+    initial_count = 0
     if cache_existe(NOMBRE_CACHE):
         ruta = os.path.join(CACHE_DIR, f"{NOMBRE_CACHE}.jsonl")
-        n    = sum(1 for _ in open(ruta, encoding='utf-8'))
-        logger.info(f"Diálogos: cache encontrada ({n:,} fragmentos). Saltando.")
-        return n
+        initial_count = sum(1 for _ in open(ruta, encoding='utf-8'))
+        if initial_count >= MAX_DIALOGOS_FRAGMENTOS:
+            logger.info(f"Diálogos: cache completa ({initial_count:,} fragmentos). Saltando.")
+            return initial_count
+        else:
+            logger.info(f"Diálogos: cache parcial ({initial_count:,}/{MAX_DIALOGOS_FRAGMENTOS:,}). Continuando...")
 
     logger.info(f"Iniciando descarga de diálogos en español (HF streaming)...")
 
@@ -605,9 +630,9 @@ def procesar_dialogos_naturales():
     except ImportError:
         return 0
 
-    total_frag = 0
+    total_frag = initial_count
+    encountered_frag = 0
     buffer: list[str] = []
-    
     # Diálogos: Usamos opus-100
     datasets_config = [
         {"path": "Helsinki-NLP/opus-100", "name": "en-es", "split": "train"},
@@ -635,6 +660,10 @@ def procesar_dialogos_naturales():
                     continue
 
                 if len(texto) < 40:
+                    continue
+
+                encountered_frag += 1
+                if encountered_frag <= initial_count:
                     continue
 
                 texto_limpio = limpiar_texto_natural(texto)
