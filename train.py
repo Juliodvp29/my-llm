@@ -169,11 +169,9 @@ def entrenar_epoca(rank, model, loader, optimizer, scheduler, scaler, config,
             tok_per_sec      = tokens_procesados / elapsed
 
             # Memoria real (DDP mantiene balance 50/50 exacto)
-            vram_info = ""
-            for i in range(world_size):
-                vram_used  = torch.cuda.max_memory_allocated(i) / 1e9
-                vram_total = torch.cuda.get_device_properties(rank).total_memory / 1e9
-                vram_info  = f" | GPU{rank}: {vram_used:.1f}/{vram_total:.1f}GB"
+            vram_used  = torch.cuda.max_memory_allocated(rank) / 1e9
+            vram_total = torch.cuda.get_device_properties(rank).total_memory / 1e9
+            vram_info  = f" | GPU{rank}: {vram_used:.1f}/{vram_total:.1f}GB"
 
             print(
                 f"  Época {epoca}/{total_epocas} | "
