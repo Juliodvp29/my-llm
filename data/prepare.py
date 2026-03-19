@@ -52,7 +52,6 @@ from data.sources import IDS_LIBROS_GUTENBERG, ARTICULOS_WIKIPEDIA, REPOS_GITHUB
 # Límites de cada fuente
 MAX_WIKIPEDIA_ARTICULOS = None
 MAX_GUTENBERG_LIBROS    = None
-MAX_OSCAR_FRAGMENTOS    = 130_000
 MAX_DIALOGOS_FRAGMENTOS  = 300_000
 MAX_OPENSUBTITLES_FRAGMENTOS = 100_000
 MAX_GITHUB_FRAGMENTOS   = 200_000
@@ -256,12 +255,14 @@ def procesar_wikipedia_con_hilos():
     buffer: list[str] = []
     exitos = fallos = 0
 
-    def fetch_con_delay(title: str):
-        time.sleep(random.uniform(0.3, 0.7))
+    def fetch_rapido(title: str):
+        # Un pequeño jitter residual para evitar ráfagas masivas en el mismo milisegundo
+        time.sleep(random.uniform(0.01, 0.05))
         return title, fetch_wikipedia_article(title)
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = {executor.submit(fetch_con_delay, t): t for t in pendientes}
+    # Aumentamos trabajadores a 20 para paralelizar significativamente
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        futures = {executor.submit(fetch_rapido, t): t for t in pendientes}
 
         for idx, future in enumerate(as_completed(futures), 1):
             try:
@@ -498,111 +499,7 @@ def procesar_repositorios_locales():
 
 # FUENTE 4 — HUGGING FACE OSCAR (texto web en español)
 
-def procesar_oscar_spanish():
-    """
-    Descarga fragmentos del dataset OSCAR (español) desde Hugging Face
-    usando streaming — nunca descarga el dataset completo.
 
-    Requiere: pip install datasets
-    """
-    NOMBRE_CACHE = "oscar_spanish"
-
-    initial_count = 0
-    if cache_existe(NOMBRE_CACHE):
-        ruta = os.path.join(CACHE_DIR, f"{NOMBRE_CACHE}.jsonl")
-        initial_count = sum(1 for _ in open(ruta, encoding='utf-8'))
-        if initial_count >= MAX_OSCAR_FRAGMENTOS:
-            logger.info(f"OSCAR español: cache completa ({initial_count:,} fragmentos). Saltando.")
-            return initial_count
-        else:
-            logger.info(f"OSCAR español: cache parcial ({initial_count:,}/{MAX_OSCAR_FRAGMENTOS:,}). Continuando...")
-
-    logger.info(
-        f"Iniciando descarga de OSCAR español via streaming "
-        f"(limite: {MAX_OSCAR_FRAGMENTOS:,} fragmentos)..."
-    )
-
-    try:
-        from datasets import load_dataset
-    except ImportError:
-        logger.error(
-            "La librería 'datasets' no está instalada. "
-            "Ejecuta: pip install datasets"
-        )
-        return 0
-
-    total_frag = initial_count
-    encountered_frag = 0
-    docs_procesados = docs_saltados = 0
-
-    try:
-        # Usamos un dataset público y accesible sin gating
-        logger.info("  Cargando Spanish Billion Words (Muestra)...")
-        dataset = load_dataset(
-            "pablousieto/spanish_billion_words", 
-            split="train",
-            streaming=True
-        )
-
-        for doc in dataset:
-            # Cada documento tiene un campo "text"
-            texto = doc.get("text", "").strip()
-
-            # Filtros de calidad básicos
-            if len(texto) < 200:
-                docs_saltados += 1
-                continue
-            # Descartamos documentos con demasiados caracteres no latinos
-            chars_latinos = sum(
-                1 for c in texto
-                if unicodedata.category(c).startswith(('L', 'N', 'Z', 'P'))
-            )
-            if chars_latinos / max(len(texto), 1) < 0.85:
-                docs_saltados += 1
-                continue
-
-            texto_limpio = limpiar_texto_natural(texto)
-            frags = fragmentar_por_parrafos(texto_limpio)
-
-            for frag in frags:
-                encountered_frag += 1
-                if encountered_frag <= initial_count:
-                    continue
-
-                if total_frag >= MAX_OSCAR_FRAGMENTOS:
-                    break
-                buffer.append(frag)
-                total_frag += 1
-
-            docs_procesados += 1
-
-            # Guardamos en cache cada 1000 documentos
-            if docs_procesados % 1000 == 0:
-                guardar_en_cache(buffer, NOMBRE_CACHE)
-                buffer = []
-                logger.info(
-                    f"  [OSCAR] {docs_procesados:,} docs procesados | "
-                    f"Fragmentos: {total_frag:,}/{MAX_OSCAR_FRAGMENTOS:,}"
-                )
-
-            if total_frag >= MAX_OSCAR_FRAGMENTOS:
-                logger.info(
-                    f"  Limite de {MAX_OSCAR_FRAGMENTOS:,} fragmentos alcanzado."
-                )
-                break
-
-    except Exception as e:
-        logger.error(f"Error al procesar OSCAR: {e}")
-
-    finally:
-        # Guardamos lo que quede en el buffer
-        guardar_en_cache(buffer, NOMBRE_CACHE)
-
-    logger.info(
-        f"OSCAR español: {docs_procesados:,} documentos procesados, "
-        f"{docs_saltados:,} saltados, {total_frag:,} fragmentos guardados."
-    )
-    return total_frag
 
 
 # FUENTE 4.1 — DIÁLOGOS Y LENGUAJE NATURAL (Hugging Face)
@@ -932,7 +829,7 @@ def generar_dataset_completo():
     logger.info("Si interrumpes y reinicias, el progreso se conserva.")
     logger.info("=" * 60)
 
-    frag_wiki = frag_gutenberg = frag_local = frag_oscar = frag_github = 0
+    frag_wiki = frag_gutenberg = frag_local = frag_github = 0
 
     try:
         # Fuente 1 — Wikipedia
@@ -945,10 +842,6 @@ def generar_dataset_completo():
 
         # Fuente 3 — Repos locales (solo en PC, se salta en Colab)
         frag_local     = procesar_repositorios_locales()
-        logger.info("-" * 60)
-
-        # Fuente 4 — OSCAR español (Hugging Face, streaming)
-        frag_oscar     = procesar_oscar_spanish()
         logger.info("-" * 60)
 
         # Fuente 4.1 — Diálogos Naturales
@@ -976,7 +869,6 @@ def generar_dataset_completo():
         logger.info(f"  Wikipedia:    {frag_wiki:,} fragmentos")
         logger.info(f"  Gutenberg:    {frag_gutenberg:,} fragmentos")
         logger.info(f"  Repos local:  {frag_local:,} fragmentos")
-        logger.info(f"  OSCAR español: {frag_oscar:,} fragmentos")
         logger.info(f"  Diálogos:     {frag_dialogos:,} fragmentos")
         logger.info(f"  Subtítulos:   {frag_subs:,} fragmentos")
         logger.info(f"  GitHub API:   {frag_github:,} fragmentos")

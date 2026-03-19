@@ -23,17 +23,17 @@ CONFIG = {
     "d_ff"       : 4096,
     "max_len"    : 512,
     "dropout"    : 0.1,
-    "batch_size_per_gpu" : 6,
-    "accumulation_steps" : 6,
+    "batch_size_per_gpu" : 4,
+    "accumulation_steps" : 8,
     "epochs"             : 6,
     "lr"                 : 2e-4,
     "grad_clip"          : 1.0,
     "warmup_steps"       : 3000,
 
     # Rutas
- "dataset_path"  : "/kaggle/input/my-llm-kaggle/data/dataset.jsonl" if KAGGLE else "data/dataset.jsonl",
-    "tokenizer_path": "/kaggle/input/my-llm-kaggle/models/tokenizer.json" if KAGGLE else "models/tokenizer.json",
-    "checkpoint_dir": "/kaggle/working/checkpoints" if KAGGLE else "models/checkpoints",
+  "dataset_path"  : "data/dataset.jsonl",
+    "tokenizer_path": "models/tokenizer.json",
+    "checkpoint_dir": "models/checkpoints",
 }
 
 # DATASET
