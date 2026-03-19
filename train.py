@@ -148,7 +148,7 @@ def entrenar_epoca(rank, model, loader, optimizer, scheduler, scaler, config,
                 "epoca"       : epoca,
                 "batch_idx"   : batch_idx,
                 "config"      : config,
-                "val_loss"    : float('inf'),  # no tenemos val_loss todavía
+                "val_loss" : mejor_val_loss,
                 "mejor_val_loss": mejor_val_loss,
                 "model_state" : model.module.state_dict(),
                 "optimizer"   : optimizer.state_dict(),
@@ -226,7 +226,8 @@ def cargar_checkpoint_si_existe(rank, model, optimizer, scheduler, scaler, dir_p
     # En DDP, usamos model.module obligatoriamente para inyectar los pesos reales
     model.module.load_state_dict(ck["model_state"])
     optimizer.load_state_dict(ck["optimizer"])
-    scheduler.load_state_dict(ck["scheduler"])
+    if scheduler is not None and "scheduler" in ck:
+        scheduler.load_state_dict(ck["scheduler"])
     
     if "scaler" in ck:
         scaler.load_state_dict(ck["scaler"])
@@ -312,27 +313,32 @@ def main_worker(rank, world_size):
         {"params": no_decay_params, "weight_decay": 0.0},
     ], lr=CONFIG["lr"], betas=(0.9, 0.95), eps=1e-8)
 
-    # ── Scheduler
-    total_steps  = len(train_loader) * CONFIG["epochs"]
-    warmup_steps = CONFIG["warmup_steps"]
+    # ── Scaler (sin scheduler todavía)
+    scaler = torch.amp.GradScaler(enabled=True)
 
-    def lr_lambda(step):
-        if step < warmup_steps: return float(step) / max(warmup_steps, 1)
-        progress = (step - warmup_steps) / max(total_steps - warmup_steps, 1)
-        return max(0.1, 0.5 * (1.0 + math.cos(math.pi * progress)))
-
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
-    scaler    = torch.amp.GradScaler(enabled=True)
-
-    # ── Checkpoint
+    # ── Checkpoint — PRIMERO cargamos para saber desde qué época venimos
     epoca_inicio, mejor_val_loss = cargar_checkpoint_si_existe(
-        rank, model, optimizer, scheduler, scaler, CONFIG["checkpoint_dir"]
+        rank, model, optimizer, None, scaler, CONFIG["checkpoint_dir"]
     )
 
+    # ── Verificar si ya terminó
     if epoca_inicio > CONFIG["epochs"]:
         if rank == 0: print("Entrenamiento completado.")
         dist.destroy_process_group()
         return
+
+    # ── Scheduler — AHORA sí tenemos epoca_inicio disponible
+    total_steps     = len(train_loader) * CONFIG["epochs"]
+    warmup_steps    = CONFIG["warmup_steps"]
+    pasos_ya_hechos = len(train_loader) * (epoca_inicio - 1)
+
+    def lr_lambda(step):
+        step_real = step + pasos_ya_hechos
+        if step_real < warmup_steps: return float(step_real) / max(warmup_steps, 1)
+        progress = (step_real - warmup_steps) / max(total_steps - warmup_steps, 1)
+        return max(0.1, 0.5 * (1.0 + math.cos(math.pi * progress)))
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
     # ── Bucle de iteración
     t_total = time.time()
