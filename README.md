@@ -131,4 +131,3 @@ El framework principal usado es PyTorch. Instala las dependencias típicas de In
 ```bash
 pip install torch torchvision torchaudio
 pip install tokenizers
-```
