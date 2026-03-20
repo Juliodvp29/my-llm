@@ -71,7 +71,7 @@ def generar(model, tokenizer, prompt: str,
 
 if __name__ == "__main__":
     model, tokenizer = cargar_modelo(
-        checkpoint_path="models/checkpoints/best_model.pt",
+        checkpoint_path="models/checkpoints/last_model.pt",
         tokenizer_path ="models/tokenizer.json",
     )
 
