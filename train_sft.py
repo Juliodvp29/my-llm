@@ -212,7 +212,17 @@ def main_worker(rank, world_size):
 
     # Cargar pesos del pre-entrenamiento
     ck = torch.load(CONFIG_SFT["pretrain_checkpoint"], map_location=f"cuda:{rank}")
-    model.load_state_dict(ck["model_state"])
+    
+    # ── Manejo mágico del Positional Encoding ──
+    # Borramos el buffer de posición del tensor viejo (512) para que Pytorch no intente 
+    # meterlo a la fuerza en nuestra nueva matriz de 1024 y crashee.
+    state_dict = ck["model_state"]
+    if "embedding.pos_enc.pe" in state_dict:
+        if state_dict["embedding.pos_enc.pe"].shape != model.embedding.pos_enc.pe.shape:
+            del state_dict["embedding.pos_enc.pe"]
+            
+    model.load_state_dict(state_dict, strict=False)
+    
     if rank == 0:
         print(f"Pesos cargados desde: {CONFIG_SFT['pretrain_checkpoint']}")
 
