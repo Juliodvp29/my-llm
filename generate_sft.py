@@ -74,13 +74,15 @@ if __name__ == "__main__":
         print(f"Respuesta: {respuesta}")
         print("-" * 40)
 
-    # Modo interactivo
-    print("\nModo chat interactivo (escribe 'salir' para terminar)\n")
-    while True:
-        pregunta = input("Tú: ").strip()
-        if pregunta.lower() in ("salir", "exit", "q"):
-            break
-        if not pregunta:
-            continue
-        respuesta = chat(model, tokenizer, pregunta)
-        print(f"IA: {respuesta}\n")
+    print("\n--- Pruebas finalizadas con éxito ---")
+
+    # # Modo interactivo
+    # print("\nModo chat interactivo (escribe 'salir' para terminar)\n")
+    # while True:
+    #     pregunta = input("Tú: ").strip()
+    #     if pregunta.lower() in ("salir", "exit", "q"):
+    #         break
+    #     if not pregunta:
+    #         continue
+    #     respuesta = chat(model, tokenizer, pregunta)
+    #     print(f"IA: {respuesta}\n")
