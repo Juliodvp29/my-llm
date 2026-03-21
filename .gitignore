@@ -27,4 +27,5 @@ build/
 dataset.jsonl
 data/raw
 *.jsonl
-models/checkpoints/
+models/checkpoints/
+models/checkpoints_sft/
