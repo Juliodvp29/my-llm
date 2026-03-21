@@ -119,18 +119,21 @@ class MiniGPT(nn.Module):
 
     @torch.no_grad()
     def generate(self, input_ids: torch.Tensor, max_new_tokens: int = 50,
-                 temperature: float = 1.0, top_k: int = 40) -> torch.Tensor:
+                 temperature: float = 1.0, top_k: int = 40, eos_id: int = None) -> torch.Tensor:
         """Rutina heurística generativa condicionada a un prompt inicial (input_ids)."""
         self.eval()
+        # Usamos dinámicamente el tamaño de memoria máximo que tenga instanciado el modelo
+        max_context = self.embedding.pos_enc.pe.size(1)
+        
         for _ in range(max_new_tokens):
-            # Si la secuencia es muy larga, recortamos
-            ctx = input_ids[:, -256:]
+            # Recortar SOLAMENTE si excede el abismal límite del modelo (¡no un 256 harcodeado!)
+            ctx = input_ids[:, -max_context:]
 
             # Forward pass
             logits = self(ctx)
 
             # Tomamos solo los logits del ÚLTIMO token
-            logits = logits[:, -1, :] / temperature
+            logits = logits[:, -1, :] / max(temperature, 1e-5)
 
             # Top-k: ponemos -inf a todo lo que no sea top-k
             if top_k is not None:
@@ -143,6 +146,10 @@ class MiniGPT(nn.Module):
 
             # Concatenamos el nuevo token a la secuencia
             input_ids = torch.cat([input_ids, next_token], dim=1)
+            
+            # ¡Si el modelo nos regala el <eos>, rompemos el bucle infinito y ahorramos a la GPU!
+            if eos_id is not None and next_token.item() == eos_id:
+                break
 
         return input_ids
 

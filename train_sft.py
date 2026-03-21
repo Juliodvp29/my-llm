@@ -23,7 +23,7 @@ CONFIG_SFT = {
     "dropout"            : 0.05,
     "batch_size_per_gpu" : 1,
     "accumulation_steps" : 16,
-    "epochs"             : 5,
+    "epochs"             : 3,
     "lr"                 : 1e-5,
     "grad_clip"          : 1.0,
     "warmup_steps"       : 50,
