@@ -17,7 +17,7 @@ def cargar_modelo(checkpoint_path, tokenizer_path):
     return model, tokenizer
 
 
-def chat(model, tokenizer, pregunta, max_new_tokens=150, temperature=0.7, top_k=40):
+def chat(model, tokenizer, pregunta, max_new_tokens=150, temperature=0.5, top_k=20):
     bos_id = tokenizer.token_to_id("<bos>")
     eos_id = tokenizer.token_to_id("<eos>")
 

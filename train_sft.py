@@ -19,18 +19,18 @@ CONFIG_SFT = {
     "n_heads"            : 16,
     "n_layers"           : 24,
     "d_ff"               : 4096,
-    "max_len"            : 512,
+    "max_len"            : 1024,
     "dropout"            : 0.05,
-    "batch_size_per_gpu" : 2,
-    "accumulation_steps" : 8,
-    "epochs"             : 3,
-    "lr"                 : 2e-5,
+    "batch_size_per_gpu" : 1,
+    "accumulation_steps" : 16,
+    "epochs"             : 5,
+    "lr"                 : 1e-5,
     "grad_clip"          : 1.0,
     "warmup_steps"       : 50,
 
     "dataset_path"       : "data/sft_dataset.jsonl",
     "tokenizer_path"     : "models/tokenizer.json",
-    "pretrain_checkpoint": "models/checkpoints/last_model.pt",
+    "pretrain_checkpoint": "models/checkpoints_sft/sft_best_model.pt",
     "checkpoint_dir"     : "models/checkpoints_sft",
 }
 
@@ -62,7 +62,7 @@ class SFTDataset(Dataset):
                 saltados += 1
                 continue
             if len(ids) > max_len + 1:
-                ids = ids[:max_len + 1]
+                ids = ids[:max_len] + [eos_id]
 
             ids = ids + [pad_id] * (max_len + 1 - len(ids))
 
