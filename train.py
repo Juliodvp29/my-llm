@@ -186,13 +186,17 @@ def entrenar_epoca(rank, model, loader, optimizer, scheduler, scaler, config,
     dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
     return loss_tensor.item() / world_size
 
-def evaluar(rank, model, loader, config, pad_id, world_size):
+def evaluar(rank, model, loader, config, pad_id, world_size, limit_batches=None):
     model.eval()
     perdida_total = 0.0
     batches       = 0
+    t_eval_start  = time.time()
 
     with torch.no_grad():
-        for inputs, targets in loader:
+        for i, (inputs, targets) in enumerate(loader):
+            if limit_batches and i >= limit_batches:
+                break
+                
             inputs  = inputs.to(rank, non_blocking=True)
             targets = targets.to(rank, non_blocking=True)
 
@@ -206,6 +210,10 @@ def evaluar(rank, model, loader, config, pad_id, world_size):
                 )
             perdida_total += loss.item()
             batches       += 1
+            
+            if rank == 0 and (i + 1) % 500 == 0:
+                elapsed = time.time() - t_eval_start
+                print(f"    [Eval] Batch {i+1}/{limit_batches if limit_batches else len(loader)} | Tiempo: {elapsed:.1f}s")
         
         if batches == 0:
             return float('inf')
@@ -265,8 +273,6 @@ def main_worker(rank, world_size):
     if rank == 0:
         print("=" * 60)
         print("Comenzando — Entrenamiento !!")
-        loss_inicial = evaluar(rank, model, val_loader, CONFIG, pad_id, world_size)
-        print(f"Loss inicial (esperado ~10.4): {loss_inicial:.4f}")
         print("=" * 60)
         os.makedirs(CONFIG["checkpoint_dir"], exist_ok=True)
 
@@ -314,10 +320,11 @@ def main_worker(rank, world_size):
     if rank == 0:
         print(f"Modelo cargado ({(sum(p.numel() for p in model.parameters())):,} parámetros)\n")
 
-    # ── Verificación inicial para confirmar que el modelo está aprendiendo realmente
-    loss_inicial = evaluar(rank, model, val_loader, CONFIG, pad_id, world_size)
+    # ── Verificación inicial (Esto debe ir DESPUÉS de model = DDP)
+    # Solo evaluamos 100 batches para un cálculo rápido de la pérdida inicial
+    loss_inicial = evaluar(rank, model, val_loader, CONFIG, pad_id, world_size, limit_batches=100)
     if rank == 0:
-        print(f"Loss inicial (debe ser ~10.4 para modelo aleatorio): {loss_inicial:.4f}")
+        print(f"Loss inicial (esperado ~10.4): {loss_inicial:.4f}")
 
     # ── Optimizador
     decay_params    = [p for n, p in model.module.named_parameters() if p.requires_grad and p.dim() >= 2]
