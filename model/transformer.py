@@ -59,29 +59,22 @@ class MiniGPT(nn.Module):
     ):
         super().__init__()
 
-        # Capa 1: embedding + posición
+        # 1. Crear todas las capas primero
         self.embedding = TransformerEmbedding(
             vocab_size, d_model, max_len, dropout
         )
-
-        # Capas 2..N+1: bloques Transformer apilados
         self.blocks = nn.ModuleList([
             TransformerBlock(d_model, n_heads, d_ff, dropout)
             for _ in range(n_layers)
         ])
-
-        # Normalización final (estabiliza antes de la proyección)
         self.norm = nn.LayerNorm(d_model)
-
-        # Capa de salida: proyecta d_model → vocab_size
-        # Produce un logit por cada token posible
         self.head = nn.Linear(d_model, vocab_size, bias=False)
 
-        # Weight Tying: optimización de parámetros compartidos
-        self.head.weight = self.embedding.token_emb.embedding.weight
-
-        # Inicialización de parámetros para estabilización algorítmica
+        # 2. Inicializar pesos
         self._init_weights()
+
+        # 3. Weight tying AL FINAL
+        self.head.weight = self.embedding.token_emb.embedding.weight
 
     def _init_weights(self):
         for module in self.modules():

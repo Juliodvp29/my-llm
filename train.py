@@ -21,17 +21,16 @@ CONFIG = {
     "n_heads"    : 16,
     "n_layers"   : 24,
     "d_ff"       : 4096,
-    "max_len"    : 512,
+    "max_len"    : 1024,  
     "dropout"    : 0.1,
-    "batch_size_per_gpu" : 4,
-    "accumulation_steps" : 8,
+    "batch_size_per_gpu" : 2,  
+    "accumulation_steps" : 16, 
     "epochs"             : 6,
     "lr"                 : 2e-4,
     "grad_clip"          : 1.0,
     "warmup_steps"       : 3000,
 
-    # Rutas
-  "dataset_path"  : "data/dataset.jsonl",
+    "dataset_path"  : "data/dataset.jsonl",
     "tokenizer_path": "models/tokenizer.json",
     "checkpoint_dir": "models/checkpoints",
 }
@@ -207,10 +206,19 @@ def evaluar(rank, model, loader, config, pad_id, world_size):
                 )
             perdida_total += loss.item()
             batches       += 1
+        
+        if batches == 0:
+            return float('inf')
 
-    loss_tensor = torch.tensor(perdida_total / max(1, batches)).to(rank)
+    loss_tensor = torch.tensor(perdida_total / batches).to(rank)
     dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
-    return loss_tensor.item() / world_size
+    resultado = loss_tensor.item() / world_size
+    
+    # Verificación de sanidad — un loss menor a 1.0 es sospechoso
+    if rank == 0:
+        print(f"  [Debug eval] batches={batches}, loss_promedio={resultado:.4f}")
+    
+    return resultado
 
 def cargar_checkpoint_si_existe(rank, model, optimizer, scheduler, scaler, dir_path):
     ruta = os.path.join(dir_path, "last_model.pt")
@@ -257,6 +265,8 @@ def main_worker(rank, world_size):
     if rank == 0:
         print("=" * 60)
         print("Comenzando — Entrenamiento !!")
+        loss_inicial = evaluar(rank, model, val_loader, CONFIG, pad_id, world_size)
+        print(f"Loss inicial (esperado ~10.4): {loss_inicial:.4f}")
         print("=" * 60)
         os.makedirs(CONFIG["checkpoint_dir"], exist_ok=True)
 
@@ -303,6 +313,11 @@ def main_worker(rank, world_size):
 
     if rank == 0:
         print(f"Modelo cargado ({(sum(p.numel() for p in model.parameters())):,} parámetros)\n")
+
+    # ── Verificación inicial para confirmar que el modelo está aprendiendo realmente
+    loss_inicial = evaluar(rank, model, val_loader, CONFIG, pad_id, world_size)
+    if rank == 0:
+        print(f"Loss inicial (debe ser ~10.4 para modelo aleatorio): {loss_inicial:.4f}")
 
     # ── Optimizador
     decay_params    = [p for n, p in model.module.named_parameters() if p.requires_grad and p.dim() >= 2]

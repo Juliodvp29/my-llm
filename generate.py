@@ -116,19 +116,19 @@ if __name__ == "__main__":
     print()
 
     # --- Modo interactivo ---
-    print("-"*50)
-    print("Modo interactivo (ingresar 'salir' para terminar)\n")
+    # print("-"*50)
+    # print("Modo interactivo (ingresar 'salir' para terminar)\n")
 
-    while True:
-        prompt = input("Prompt: ").strip()
-        if prompt.lower() in ("salir", "exit", "q"):
-            break
-        if not prompt:
-            continue
+    # while True:
+    #     prompt = input("Prompt: ").strip()
+    #     if prompt.lower() in ("salir", "exit", "q"):
+    #         break
+    #     if not prompt:
+    #         continue
 
-        temp  = 0.8
-        tokens = 60
+    #     temp  = 0.8
+    #     tokens = 60
 
-        resultado = generar(model, tokenizer, prompt,
-                           max_new_tokens=tokens, temperature=temp)
-        print(f"Modelo: {resultado}\n")
+    #     resultado = generar(model, tokenizer, prompt,
+    #                        max_new_tokens=tokens, temperature=temp)
+    #     print(f"Modelo: {resultado}\n")

@@ -22,18 +22,18 @@ CONFIG_SFT = {
     "n_heads"            : 16,
     "n_layers"           : 24,
     "d_ff"               : 4096,
-    "max_len"            : 1024,
+    "max_len"            : 512,
     "dropout"            : 0.05,
-    "batch_size_per_gpu" : 1,
+    "batch_size_per_gpu" : 2,
     "accumulation_steps" : 16,
-    "epochs"             : 3,
-    "lr"                 : 1e-5,
+    "epochs"             : 3,          
+    "lr"                 : 5e-6,        
     "grad_clip"          : 1.0,
     "warmup_steps"       : 50,
 
     "dataset_path"       : "data/sft_dataset.jsonl",
     "tokenizer_path"     : "models/tokenizer.json",
-    "pretrain_checkpoint": "models/checkpoints/last_model.pt",
+    "pretrain_checkpoint": "models/checkpoints/best_model.pt", 
     "checkpoint_dir"     : "models/checkpoints_sft",
 }
 
@@ -103,7 +103,7 @@ def entrenar_epoca(rank, model, loader, optimizer, scheduler, scaler, config,
                 logits.view(-1, config["vocab_size"]),
                 targets.view(-1),
                 ignore_index=pad_id,
-                label_smoothing=0.05,
+                label_smoothing=0.0,
             )
             loss_scaled = loss / accumulation_steps
 
@@ -227,6 +227,13 @@ def main_worker(rank, world_size):
     if "embedding.pos_enc.pe" in state_dict:
         if state_dict["embedding.pos_enc.pe"].shape != model.embedding.pos_enc.pe.shape:
             del state_dict["embedding.pos_enc.pe"]
+
+        missing, unexpected = model.load_state_dict(state_dict, strict=False)
+        if rank == 0:
+            print(f"Claves faltantes: {len(missing)}")
+            print(f"Claves inesperadas: {len(unexpected)}")
+            if missing:
+                print("Primeras 5 faltantes:", missing[:5])
             
     model.load_state_dict(state_dict, strict=False)
     
