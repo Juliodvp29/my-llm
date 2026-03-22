@@ -29,3 +29,6 @@ data/raw
 *.jsonl
 models/checkpoints/
 models/checkpoints_sft/
+
+#xd.md
+xd.md

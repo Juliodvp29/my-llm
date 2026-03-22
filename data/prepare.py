@@ -739,6 +739,49 @@ def procesar_github_api():
     return total_frag
 
 
+def consolidar_cache_en_output():
+    import random
+    
+    FUENTES = {
+        "codigo_github"     : 90_580,   # todo
+        "codigo_local"      : 10_002,   # todo
+        "wikipedia"         : 40_165,   # todo
+        "gutenberg"         : 40_000,   # de 115k
+        "dialogos_naturales": 80_000,   # de 259k
+        "opensubtitles_es"  : 30_000,   # de 80k
+    }
+
+    total = 0
+    todos_fragmentos = []
+
+    for nombre, limite in FUENTES.items():
+        ruta = os.path.join(CACHE_DIR, f"{nombre}.jsonl")
+        if not os.path.exists(ruta):
+            logger.warning(f"No existe: {nombre}.jsonl — saltando")
+            continue
+
+        fragmentos = []
+        with open(ruta, encoding='utf-8') as f:
+            for linea in f:
+                if len(fragmentos) >= limite:
+                    break
+                fragmentos.append(linea)
+
+        todos_fragmentos.extend(fragmentos)
+        logger.info(f"  {nombre}: {len(fragmentos):,} fragmentos")
+
+    # Mezclar todo para que el entrenamiento no vea bloques puros de una fuente
+    random.seed(42)
+    random.shuffle(todos_fragmentos)
+
+    with open(OUTPUT_FILE, 'w', encoding='utf-8') as out:
+        for linea in todos_fragmentos:
+            out.write(linea)
+            total += 1
+
+    logger.info(f"Dataset consolidado: {total:,} fragmentos -> {OUTPUT_FILE}")
+    return total
+
 
 def procesar_opensubtitles():
     """

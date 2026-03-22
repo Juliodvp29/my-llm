@@ -9,6 +9,7 @@ from tokenizers import Tokenizer
 import json
 import time
 import os
+os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 import math
 
 from model.transformer import MiniGPT
@@ -23,9 +24,9 @@ CONFIG = {
     "d_ff"       : 4096,
     "max_len"    : 1024,  
     "dropout"    : 0.1,
-    "batch_size_per_gpu" : 2,  
-    "accumulation_steps" : 16, 
-    "epochs"             : 6,
+    "batch_size_per_gpu" : 3,  
+    "accumulation_steps" : 11, 
+    "epochs"             : 4,
     "lr"                 : 2e-4,
     "grad_clip"          : 1.0,
     "warmup_steps"       : 3000,
