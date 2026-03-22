@@ -11,6 +11,9 @@ import time
 import os
 import math
 
+# Optimización de VRAM: evitar fragmentación y permitir segmentos de memoria flexibles
+os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
+
 from model.transformer import MiniGPT
 
 CONFIG_SFT = {
@@ -30,7 +33,7 @@ CONFIG_SFT = {
 
     "dataset_path"       : "data/sft_dataset.jsonl",
     "tokenizer_path"     : "models/tokenizer.json",
-    "pretrain_checkpoint": "models/checkpoints_sft/sft_best_model.pt",
+    "pretrain_checkpoint": "models/checkpoints/last_model.pt",
     "checkpoint_dir"     : "models/checkpoints_sft",
 }
 
@@ -208,6 +211,10 @@ def main_worker(rank, world_size):
     # Modelo — cargamos desde el pre-entrenamiento
     model = MiniGPT(**{k: CONFIG_SFT[k] for k in
                        ["vocab_size", "d_model", "n_heads", "n_layers", "d_ff", "max_len", "dropout"]})
+    
+    # Reducción drástica de memoria: recalculamos activaciones en lugar de guardarlas
+    model.gradient_checkpointing = True
+    
     model = model.to(rank)
 
     # Cargar pesos del pre-entrenamiento
@@ -257,6 +264,9 @@ def main_worker(rank, world_size):
     historial      = []
 
     for epoca in range(1, CONFIG_SFT["epochs"] + 1):
+        # Limpieza higiénica de la memoria GPU al inicio de la época
+        torch.cuda.empty_cache()
+        
         train_sampler.set_epoch(epoca)
         t_ep = time.time()
 

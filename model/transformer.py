@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.utils.checkpoint import checkpoint
 from model.embeddings import TransformerEmbedding
 from model.attention import MultiHeadAttention, FeedForward
 
@@ -107,7 +108,12 @@ class MiniGPT(nn.Module):
 
         # Pasar por cada bloque Transformer
         for block in self.blocks:
-            out = block(out, mask)
+            if getattr(self, "gradient_checkpointing", False) and self.training:
+                # El checkpointing re-ejecuta el forward del bloque durante el backward
+                # para ahorrar guardar las activaciones en memoria.
+                out = checkpoint(block, out, mask, use_reentrant=False)
+            else:
+                out = block(out, mask)
 
         # Normalización final
         out = self.norm(out)
