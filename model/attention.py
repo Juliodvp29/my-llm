@@ -13,28 +13,18 @@ def scaled_dot_product_attention(
     mask: torch.Tensor = None
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
-    Implementación de la fórmula de atención.
+    Flash Attention via PyTorch — más rápido y eficiente en VRAM.
 
     Shapes:
         Q, K, V : (batch, heads, seq_len, d_k)
-        mask    : (batch, 1, seq_len, seq_len)  — opcional
     """
-    d_k = Q.size(-1)
-
-    # Similitud QK escalada por dimensión
-    scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k)
-
-    # Enmascaramiento causal opcional
-    if mask is not None:
-        scores = scores.masked_fill(mask == 0, float('-inf'))
-
-    # Distribución de atención mediante similitud softmax
-    weights = F.softmax(scores, dim=-1)
-
-    # Paso 4: suma ponderada de los valores
-    output = torch.matmul(weights, V)
-
-    return output, weights
+    output = torch.nn.functional.scaled_dot_product_attention(
+        Q, K, V,
+        attn_mask=None,
+        dropout_p=0.0,
+        is_causal=True  # máscara causal automática
+    )
+    return output, None
 
 
 # Auto-atención Multicabeza

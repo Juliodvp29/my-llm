@@ -315,6 +315,8 @@ def main_worker(rank, world_size):
     # ── Modelo
     model = MiniGPT(**{k: CONFIG[k] for k in
                        ["vocab_size", "d_model", "n_heads", "n_layers", "d_ff", "max_len", "dropout"]})
+    model.gradient_checkpointing = True
+    model = torch.compile(model) 
     model = model.to(rank)
     model = DDP(model, device_ids=[rank])
 
